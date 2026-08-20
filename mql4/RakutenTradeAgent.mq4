@@ -112,6 +112,8 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
 
    // 緊急全決済 (Panic Close) ボタンの描画
    CreatePanicButton("RTA_BTN_CLOSE_ALL", 20, 20, 160, 36, "🚨 CLOSE ALL (緊急全決済)");
+
+   ChartRedraw(0);
 }
 
 //+------------------------------------------------------------------+
@@ -135,6 +137,8 @@ void CreatePanicButton(string name, int x, int y, int width, int height, string 
    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrCrimson);
    ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, clrDarkRed);
    ObjectSetInteger(0, name, OBJPROP_STATE, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
 }
 
 //+------------------------------------------------------------------+
@@ -173,6 +177,8 @@ void CreateOrUpdateLabel(string name, int x, int y, string text, int font_size, 
    ObjectSetString(0, name, OBJPROP_FONT, font_name);
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
 }
 
 //+------------------------------------------------------------------+
@@ -180,8 +186,12 @@ void CreateOrUpdateLabel(string name, int x, int y, string text, int font_size, 
 //+------------------------------------------------------------------+
 void UpdateChartFibonacciOverlay()
 {
-   int highest_bar = iHighest(Symbol(), 0, MODE_HIGH, FibLookbackBars, 1);
-   int lowest_bar  = iLowest(Symbol(), 0, MODE_LOW, FibLookbackBars, 1);
+   int bars_total = iBars(Symbol(), 0);
+   if(bars_total < 10) return;
+
+   int lookback = MathMin(FibLookbackBars, bars_total - 2);
+   int highest_bar = iHighest(Symbol(), 0, MODE_HIGH, lookback, 1);
+   int lowest_bar  = iLowest(Symbol(), 0, MODE_LOW, lookback, 1);
 
    if(highest_bar < 0 || lowest_bar < 0) return;
 
@@ -195,20 +205,23 @@ void UpdateChartFibonacciOverlay()
    double fib_618 = high - (diff * 0.618);
 
    // 38.2% ライン
-   CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, "FR 38.2% (Shallow)");
+   CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, "FR 38.2% (Shallow Pullback)");
    // 50.0% ライン (半値)
-   CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, "FR 50.0% (Half Equilibrium)");
+   CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, "FR 50.0% (Equilibrium)");
    // 61.8% ライン (黄金比)
    CreateOrUpdateHLine("RTA_FIB_618", fib_618, clrOrangeRed, STYLE_SOLID, 2, "FR 61.8% (Golden Ratio Entry)");
 
    // 直近戻り高値・押し安値 (直近10本)
-   int recent_h_bar = iHighest(Symbol(), 0, MODE_HIGH, 10, 1);
-   int recent_l_bar = iLowest(Symbol(), 0, MODE_LOW, 10, 1);
+   int dow_lookback = MathMin(10, bars_total - 2);
+   int recent_h_bar = iHighest(Symbol(), 0, MODE_HIGH, dow_lookback, 1);
+   int recent_l_bar = iLowest(Symbol(), 0, MODE_LOW, dow_lookback, 1);
    if(recent_h_bar >= 0 && recent_l_bar >= 0)
    {
       CreateOrUpdateHLine("RTA_DOW_RES", High[recent_h_bar], clrMagenta, STYLE_DOT, 1, "Dow Swing High (Breakout Target)");
       CreateOrUpdateHLine("RTA_DOW_SUP", Low[recent_l_bar], clrLime, STYLE_DOT, 1, "Dow Swing Low (Micro-SL Level)");
    }
+
+   ChartRedraw(0);
 }
 
 //+------------------------------------------------------------------+
@@ -227,7 +240,10 @@ void CreateOrUpdateHLine(string name, double price, color clr, int style, int wi
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE, style);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, width);
-   ObjectSetInteger(0, name, OBJPROP_BACK, true);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false); // 前面に表示
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
+   ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
    ObjectSetString(0, name, OBJPROP_TEXT, desc);
 }
 
@@ -500,7 +516,15 @@ void CloseAllPositions()
          if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
          {
             double close_price = (OrderType() == OP_BUY) ? Bid : Ask;
-            OrderClose(OrderTicket(), OrderLots(), close_price, Slippage, clrYellow);
+            bool res = OrderClose(OrderTicket(), OrderLots(), close_price, Slippage, clrYellow);
+            if(!res)
+            {
+               PrintFormat("[RakutenTradeAgent] ❌ OrderClose failed for Ticket #%d. Error: %d", OrderTicket(), GetLastError());
+            }
+            else
+            {
+               PrintFormat("[RakutenTradeAgent] ✅ Position closed: Ticket #%d", OrderTicket());
+            }
          }
       }
    }
