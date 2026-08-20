@@ -36,6 +36,25 @@ int sock = -1;
 bool is_connected = false;
 datetime last_fib_update = 0;
 
+// Forward Declarations
+void UpdateChartHUD(string regime_str, string killswitch_str);
+void UpdateChartFibonacciOverlay();
+void CreateOrUpdateRectLabel(string name, int x, int y, int width, int height, color bg_clr, color border_clr);
+void CreateOrUpdateLabel(string name, int x, int y, string text, int font_size, string font_name, color clr);
+void CreateButton(string name, int x, int y, int width, int height, string text, color bg_clr, color border_clr);
+void CreateOrUpdateHLine(string name, double price, color clr, int style, int width, string desc);
+void DrawEntryMarker(int order_type, double price, double sl, double tp, double lot, int ticket);
+void ExecuteOrder(int order_type, double lot, double sl_pips, double tp_pips);
+void CloseAllPositions();
+void MoveStopLossToBreakEven();
+void AutoTrailingStop();
+void CheckClosedOrders();
+void ClearChartObjects();
+void InitSocket();
+void CloseSocket();
+string SendAndReceive(string message);
+void ProcessServerResponse(string json);
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -161,11 +180,35 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (No Active Position)", 9, "Arial Bold", clrDarkGray);
    }
 
-   // 4. ボタン群の描画 (緊急全決済 & 建値ロック)
-   CreateButton("RTA_BTN_CLOSE_ALL", 20, 15, 170, 30, "[!] EMERGENCY CLOSE ALL", clrCrimson, clrDarkRed);
-   CreateButton("RTA_BTN_BE_LOCK", 20, 48, 170, 28, "[LOCK] BE LOCK (建値固定)", C'13,148,136', C'15,118,110');
+   // 4. ボタン群の描画 (緊急全決済、建値ロック、極小SL手動エントリー)
+   CreateButton("RTA_BTN_CLOSE_ALL", 20, 15, 170, 28, "[!] EMERGENCY CLOSE ALL", clrCrimson, clrDarkRed);
+   CreateButton("RTA_BTN_BE_LOCK", 20, 46, 170, 26, "[LOCK] BE LOCK (建値固定)", C'13,148,136', C'15,118,110');
+   CreateButton("RTA_BTN_BUY_050", 108, 75, 82, 26, "[+] BUY (SL 4p)", C'22,101,52', C'21,128,61');
+   CreateButton("RTA_BTN_SELL_050", 20, 75, 82, 26, "[-] SELL (SL 4p)", C'153,27,27', C'185,28,28');
 
    ChartRedraw(0);
+}
+
+//+------------------------------------------------------------------+
+//| Helper to create or move Rectangle Background Panel              |
+//+------------------------------------------------------------------+
+void CreateOrUpdateRectLabel(string name, int x, int y, int width, int height, color bg_clr, color border_clr)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   }
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
+   ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bg_clr);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, border_clr);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
 }
 
 //+------------------------------------------------------------------+
@@ -212,6 +255,20 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          Print("[RakutenTradeAgent] 🔒 BE LOCK BUTTON CLICKED! Moving SL to Break-Even +0.5pips...");
          MoveStopLossToBreakEven();
          ObjectSetInteger(0, "RTA_BTN_BE_LOCK", OBJPROP_STATE, false);
+         ChartRedraw(0);
+      }
+      else if(sparam == "RTA_BTN_BUY_050")
+      {
+         Print("[RakutenTradeAgent] 🎯 MANUAL BUY 0.50Lot (SL: 4.0pips, TP: 15.0pips) Triggered!");
+         ExecuteOrder(OP_BUY, 0.50, 4.0, 15.0);
+         ObjectSetInteger(0, "RTA_BTN_BUY_050", OBJPROP_STATE, false);
+         ChartRedraw(0);
+      }
+      else if(sparam == "RTA_BTN_SELL_050")
+      {
+         Print("[RakutenTradeAgent] 🎯 MANUAL SELL 0.50Lot (SL: 4.0pips, TP: 15.0pips) Triggered!");
+         ExecuteOrder(OP_SELL, 0.50, 4.0, 15.0);
+         ObjectSetInteger(0, "RTA_BTN_SELL_050", OBJPROP_STATE, false);
          ChartRedraw(0);
       }
    }
