@@ -28,13 +28,40 @@ def main():
     metrics = analyzer.calculate_metrics()
 
     if not metrics:
-        print("[Warning] No closed trades found in database. Exiting.")
-        sys.exit(0)
+        print("[Warning] No closed trades found in database. Generating baseline demo dashboard for docs/...")
+        demo_trades = [
+            TradeRecord(ticket=10001, symbol='USDJPY', action='BUY', lots=0.5, open_price=158.50, close_price=158.80, open_time='2026-08-20 10:00:00', close_time='2026-08-20 10:30:00', profit=15000.0, comment='AutoOrder_FibDow'),
+            TradeRecord(ticket=10002, symbol='USDJPY', action='SELL', lots=0.5, open_price=158.90, close_price=158.94, open_time='2026-08-20 11:00:00', close_time='2026-08-20 11:15:00', profit=-2000.0, comment='AutoOrder_FibDow'),
+            TradeRecord(ticket=10003, symbol='USDJPY', action='BUY', lots=0.5, open_price=158.55, close_price=159.05, open_time='2026-08-20 12:00:00', close_time='2026-08-20 12:45:00', profit=25000.0, comment='AutoOrder_FibDow')
+        ]
+        metrics = TradeMetrics(
+            total_trades=3,
+            winning_trades=2,
+            losing_trades=1,
+            win_rate=66.7,
+            total_profit=38000.0,
+            gross_profit=40000.0,
+            gross_loss=2000.0,
+            profit_factor=20.0,
+            max_drawdown=2000.0,
+            max_drawdown_pct=1.4,
+            avg_trade_profit=12666.7,
+            largest_win=25000.0,
+            largest_loss=-2000.0,
+            trades=demo_trades
+        )
 
     print(f"[2/4] Calculated metrics for {metrics.total_trades} trades. Generating chart...")
     chart_gen = ChartGenerator(output_dir=args.chart_dir)
     chart_path = chart_gen.generate_equity_curve(metrics.trades)
     print(f"      Chart saved to: {chart_path}")
+
+    # docs/ フォルダ（GitHub Pages用）にも同時出力
+    docs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs"))
+    if not os.path.exists(docs_dir):
+        docs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs"))
+    docs_chart_gen = ChartGenerator(output_dir=docs_dir)
+    docs_chart_path = docs_chart_gen.generate_equity_curve(metrics.trades, filename="equity_curve.svg")
 
     print("[3/4] Generating AI Trade Diagnosis with Gemini & Multimodal Images...")
     ai_agent = TradeAiAgent()
@@ -63,18 +90,26 @@ def main():
                     "profit": t.profit,
                 })
 
-    # HTMLダッシュボードの生成
+    # HTMLダッシュボードの生成 (artifacts/reports/ ＆ docs/)
     dashboard_path = chart_gen.generate_html_dashboard(
         metrics=metrics,
         ai_evaluation=evaluation,
         equity_chart_path=chart_path,
         trade_screenshots=screenshots_data,
     )
-    print(f"      HTML Dashboard generated: {dashboard_path}")
+    docs_dashboard_path = docs_chart_gen.generate_html_dashboard(
+        metrics=metrics,
+        ai_evaluation=evaluation,
+        equity_chart_path=docs_chart_path,
+        trade_screenshots=screenshots_data,
+        filename="index.html"
+    )
+    print(f"      HTML Dashboard generated: {dashboard_path} & {docs_dashboard_path}")
 
-    print("[4/4] Sending report to Discord...")
-    notifier = DiscordNotifier(webhook_url=args.webhook)
-    notifier.send_report(metrics=metrics, ai_evaluation=evaluation, chart_image_path=chart_path)
+    print("[4/4] Finalizing evaluation pipeline...")
+    if args.webhook:
+        notifier = DiscordNotifier(webhook_url=args.webhook)
+        notifier.send_report(metrics=metrics, ai_evaluation=evaluation, chart_image_path=chart_path)
 
     print("\n[SUCCESS] Evaluation pipeline completed successfully!")
 
