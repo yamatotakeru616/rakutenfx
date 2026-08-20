@@ -36,6 +36,7 @@ input int    FibLookbackBars = 50;      // Fibonacci Lookback Bars (H1/M15/M5)
 int sock = -1;
 bool is_connected = false;
 datetime last_fib_update = 0;
+datetime last_sound_alert = 0;
 double current_manual_lot = 0.50;
 double current_fib_500 = 0.0;
 double current_fib_618 = 0.0;
@@ -141,6 +142,13 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       if(Bid >= zone_bottom && Ask <= zone_top)
       {
          in_golden_zone = true;
+         // サウンド通知 (5分に1回のみ控えめに鳴動)
+         if(TimeCurrent() - last_sound_alert >= 300)
+         {
+            PlaySound("alert.wav");
+            last_sound_alert = TimeCurrent();
+            Print("[RakutenTradeAgent] 🔔 GOLDEN ZONE ALERT: Price is inside 50.0-61.8% retracement zone!");
+         }
       }
    }
 
@@ -152,8 +160,8 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       regime_clr = clrGold;
    }
 
-   // 1. 半透明ダーク背景パネルの描画
-   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 430, 92, C'10,15,28', (in_golden_zone ? clrGold : C'34,47,76'));
+   // 1. 半透明ダーク背景パネルの描画 (高さ112pxに拡張)
+   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 450, 112, C'10,15,28', (in_golden_zone ? clrGold : C'34,47,76'));
 
    // 2. HUD テキストの描画
    CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI] <<<", 10, "Arial Bold", clrDeepSkyBlue);
@@ -205,7 +213,37 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (No Active Position)", 9, "Arial Bold", clrDarkGray);
    }
 
-   // 4. ボタン群の描画 (緊急全決済、建値ロック、ロット切替、極小SL手動エントリー)
+   // 4. 直近トレード履歴（直近3件の損益）の集計＆表示
+   string recent_str = "[RECENT] ";
+   int found_count = 0;
+   double recent_total = 0.0;
+   for(int h = OrdersHistoryTotal() - 1; h >= 0 && found_count < 3; h--)
+   {
+      if(OrderSelect(h, SELECT_BY_POS, MODE_HISTORY))
+      {
+         if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
+         {
+            double p = OrderProfit() + OrderSwap();
+            recent_total += p;
+            string sign = (p >= 0 ? "+" : "");
+            recent_str += StringFormat("%s%.0f ", sign, p);
+            found_count++;
+         }
+      }
+   }
+   if(found_count > 0)
+   {
+      string sign_t = (recent_total >= 0 ? "+" : "");
+      recent_str += StringFormat("JPY (Total: %s%.0f JPY)", sign_t, recent_total);
+      color recent_clr = (recent_total >= 0 ? clrLimeGreen : clrTomato);
+      CreateOrUpdateLabel("RTA_HUD_RECENT", 18, 96, recent_str, 8, "Arial", recent_clr);
+   }
+   else
+   {
+      CreateOrUpdateLabel("RTA_HUD_RECENT", 18, 96, "[RECENT] No past closed trades today", 8, "Arial", clrSilver);
+   }
+
+   // 5. ボタン群の描画
    CreateButton("RTA_BTN_CLOSE_ALL", 20, 15, 170, 26, "[!] EMERGENCY CLOSE ALL", clrCrimson, clrDarkRed);
    CreateButton("RTA_BTN_BE_LOCK", 20, 44, 170, 24, "[LOCK] BE LOCK (建値固定)", C'13,148,136', C'15,118,110');
    
