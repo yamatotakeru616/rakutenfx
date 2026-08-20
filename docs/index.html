@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT4 AI Trading Performance Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #090d16;
+            --bg-card: #131b2e;
+            --border-color: #222f4c;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-cyan: #38bdf8;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-gold: #fbbf24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 24px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        h1 { font-size: 22px; font-weight: 700; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px; }
+        .badge-live {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+        }
+        .stat-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+        .val-positive { color: var(--accent-green); }
+        .val-negative { color: var(--accent-red); }
+        .val-cyan { color: var(--accent-cyan); }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 850px) {
+            .grid-2col { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .card h2 { font-size: 18px; margin-bottom: 16px; color: var(--text-primary); border-left: 4px solid var(--accent-cyan); padding-left: 8px; }
+        .chart-img { width: 100%; border-radius: 8px; display: block; }
+        .ai-report-content {
+            white-space: pre-wrap;
+            font-size: 14px;
+            color: #cbd5e1;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #0b1120;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #1e293b;
+        }
+
+        .screenshots-section h2 { font-size: 20px; margin-bottom: 16px; color: var(--accent-cyan); }
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
+        }
+        .screenshot-card {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .screenshot-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ticket-badge { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+        .rank-badge {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        .rank-S { background: #854d0e; color: #fef08a; }
+        .rank-A { background: #065f46; color: #a7f3d0; }
+        .rank-B { background: #1e40af; color: #bfdbfe; }
+        .rank-C { background: #991b1b; color: #fecaca; }
+        .image-wrapper img {
+            width: 100%;
+            height: auto;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .ai-feedback { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+        .empty-state { color: var(--text-secondary); text-align: center; padding: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 楽天MT4 AIクオンツ パイプライン ダッシュボード</h1>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="badge-live">● LIVE ONLINE</span>
+                <span style="font-size: 13px; color: var(--text-secondary);">最終更新: 2026-08-20 12:45:00</span>
+            </div>
+        </header>
+
+        <section class="metrics-grid">
+            <div class="stat-card">
+                <div class="stat-label">純損益 (Net Profit)</div>
+                <div class="stat-value val-positive">+38,000.0 円</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">勝率 (Win Rate)</div>
+                <div class="stat-value val-cyan">66.7% <span style="font-size: 14px; color: var(--text-secondary);">(2勝 1敗)</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">プロフィットファクター (PF)</div>
+                <div class="stat-value val-cyan">20.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">最大ドローダウン</div>
+                <div class="stat-value val-negative">2,000.0 円 (1.4%)</div>
+            </div>
+        </section>
+
+        <section class="grid-2col">
+            <div class="card">
+                <h2>📈 資産推移曲線 (Cumulative Equity)</h2>
+                <img class="chart-img" src="equity_curve.svg" alt="Equity Curve" />
+            </div>
+            <div class="card">
+                <h2>🧠 Gemini 3.6 クオンツ診断レポート</h2>
+                <div class="ai-report-content">【総合評価スコア: 95点】
+上位足フィボナッチ(50.0-61.8%)と下位足ダウ転換による極小損切り手法が極めて高精度に機能しています。
+リスク2,000円固定に対して平均利益12,666円(RR 1:6.3)を達成。</div>
+            </div>
+        </section>
+
+        <section class="screenshots-section">
+            <h2>📸 エントリー時チャート画像 ＆ AIマルチモーダル診断</h2>
+            <div class="screenshots-grid">
+                <div class="empty-state">まだ記録されたエントリーチャート画像がありません。</div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

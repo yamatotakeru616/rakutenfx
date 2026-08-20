@@ -6,7 +6,10 @@
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP_Engine-FFF000.svg?logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![Gemini 3.6](https://img.shields.io/badge/Gemini_3.6-Multimodal_Quant_AI-8E75C2.svg?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Hardware](https://img.shields.io/badge/GPU-RTX_3050_Ti_DirectML-76B900.svg?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
+[![Dashboard](https://img.shields.io/badge/Live_Dashboard-GitHub_Pages-00F5FF.svg?logo=githubpages&logoColor=black)](https://yamatotakeru616.github.io/rakutenfx/)
 [![CI](https://github.com/yamatotakeru616/rakutenfx/actions/workflows/ci.yml/badge.svg)](https://github.com/yamatotakeru616/rakutenfx/actions/workflows/ci.yml)
+
+> 🌐 **[リアルタイム AIクオンツ ライブダッシュボードはこちら (GitHub Pages)](https://yamatotakeru616.github.io/rakutenfx/)**
 
 楽天MT4 / デモ口座を起点とした、**Rust超高速シグナルエンジン ⇄ MQL4可視化・発注 ⇄ DuckDBインメモリOLAPバックテスト ⇄ RTX 3050Ti 画像埋め込みAIキルスイッチ ⇄ Gemini 3.6自律クオンツチューナー** を一気通貫で統合した次世代自動売買システムです。
 

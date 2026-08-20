@@ -124,6 +124,15 @@ class ChartGenerator:
         else:
             screenshot_cards = """<div class="empty-state">まだ記録されたエントリーチャート画像がありません。</div>"""
 
+        # 最終更新日時フォーマット
+        last_close_time = "N/A"
+        if metrics.trades and metrics.trades[-1].close_time:
+            ct = metrics.trades[-1].close_time
+            if hasattr(ct, "strftime"):
+                last_close_time = ct.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                last_close_time = str(ct)
+
         html_content = f"""<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -158,11 +167,22 @@ class ChartGenerator:
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 16px;
             margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
         }}
-        h1 {{ font-size: 24px; font-weight: 700; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px; }}
+        h1 {{ font-size: 22px; font-weight: 700; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px; }}
+        .badge-live {{
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }}
         .metrics-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }}
@@ -211,11 +231,11 @@ class ChartGenerator:
         .screenshots-section h2 {{ font-size: 20px; margin-bottom: 16px; color: var(--accent-cyan); }}
         .screenshots-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
             gap: 20px;
         }}
         .screenshot-card {{
-            padding: 12px;
+            padding: 14px;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -250,7 +270,10 @@ class ChartGenerator:
     <div class="container">
         <header>
             <h1>🚀 楽天MT4 AIクオンツ パイプライン ダッシュボード</h1>
-            <div>最終更新: {metrics.trades[-1].close_time.strftime('%Y-%m-%d %H:%M:%S') if metrics.trades and metrics.trades[-1].close_time else 'N/A'}</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="badge-live">● LIVE ONLINE</span>
+                <span style="font-size: 13px; color: var(--text-secondary);">最終更新: {last_close_time}</span>
+            </div>
         </header>
 
         <section class="metrics-grid">
