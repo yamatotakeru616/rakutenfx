@@ -36,6 +36,9 @@ input int    FibLookbackBars = 50;      // Fibonacci Lookback Bars (H1/M15/M5)
 int sock = -1;
 bool is_connected = false;
 datetime last_fib_update = 0;
+double current_manual_lot = 0.50;
+double current_fib_500 = 0.0;
+double current_fib_618 = 0.0;
 
 // Forward Declarations
 void UpdateChartHUD(string regime_str, string killswitch_str);
@@ -129,12 +132,32 @@ void OnTick()
 //+------------------------------------------------------------------+
 void UpdateChartHUD(string regime_str, string killswitch_str)
 {
+   // 黄金ゾーン（50.0%〜61.8%）滞在判定
+   bool in_golden_zone = false;
+   if(current_fib_500 > 0 && current_fib_618 > 0)
+   {
+      double zone_top = MathMax(current_fib_500, current_fib_618);
+      double zone_bottom = MathMin(current_fib_500, current_fib_618);
+      if(Bid >= zone_bottom && Ask <= zone_top)
+      {
+         in_golden_zone = true;
+      }
+   }
+
+   string display_regime = regime_str;
+   color regime_clr = clrLime;
+   if(in_golden_zone)
+   {
+      display_regime = ">>> IN GOLDEN ZONE (50-61.8%) - WATCH DOW BREAKOUT <<<";
+      regime_clr = clrGold;
+   }
+
    // 1. 半透明ダーク背景パネルの描画
-   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 400, 92, C'10,15,28', C'34,47,76');
+   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 430, 92, C'10,15,28', (in_golden_zone ? clrGold : C'34,47,76'));
 
    // 2. HUD テキストの描画
    CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI] <<<", 10, "Arial Bold", clrDeepSkyBlue);
-   CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[REGIME] %s", regime_str), 9, "Arial Bold", clrLime);
+   CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[REGIME] %s", display_regime), 9, "Arial Bold", regime_clr);
    CreateOrUpdateLabel("RTA_HUD_KS", 18, 50, StringFormat("[AI KILL-SWITCH] %s", killswitch_str), 9, "Arial Bold", clrGold);
    CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, "[RISK MGMT] 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial Bold", clrLightCyan);
 
@@ -182,11 +205,17 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (No Active Position)", 9, "Arial Bold", clrDarkGray);
    }
 
-   // 4. ボタン群の描画 (緊急全決済、建値ロック、極小SL手動エントリー)
-   CreateButton("RTA_BTN_CLOSE_ALL", 20, 15, 170, 28, "[!] EMERGENCY CLOSE ALL", clrCrimson, clrDarkRed);
-   CreateButton("RTA_BTN_BE_LOCK", 20, 46, 170, 26, "[LOCK] BE LOCK (建値固定)", C'13,148,136', C'15,118,110');
-   CreateButton("RTA_BTN_BUY_050", 108, 75, 82, 26, "[+] BUY (SL 4p)", C'22,101,52', C'21,128,61');
-   CreateButton("RTA_BTN_SELL_050", 20, 75, 82, 26, "[-] SELL (SL 4p)", C'153,27,27', C'185,28,28');
+   // 4. ボタン群の描画 (緊急全決済、建値ロック、ロット切替、極小SL手動エントリー)
+   CreateButton("RTA_BTN_CLOSE_ALL", 20, 15, 170, 26, "[!] EMERGENCY CLOSE ALL", clrCrimson, clrDarkRed);
+   CreateButton("RTA_BTN_BE_LOCK", 20, 44, 170, 24, "[LOCK] BE LOCK (建値固定)", C'13,148,136', C'15,118,110');
+   
+   string lot_btn_text = StringFormat("[LOT: %.2fL]", current_manual_lot);
+   CreateButton("RTA_BTN_LOT_TOGGLE", 20, 71, 170, 22, lot_btn_text, C'30,41,59', C'51,65,85');
+
+   string buy_text = StringFormat("[+] BUY %.2fL", current_manual_lot);
+   string sell_text = StringFormat("[-] SELL %.2fL", current_manual_lot);
+   CreateButton("RTA_BTN_BUY_MANUAL", 108, 96, 82, 24, buy_text, C'22,101,52', C'21,128,61');
+   CreateButton("RTA_BTN_SELL_MANUAL", 20, 96, 82, 24, sell_text, C'153,27,27', C'185,28,28');
 
    ChartRedraw(0);
 }
@@ -259,18 +288,32 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          ObjectSetInteger(0, "RTA_BTN_BE_LOCK", OBJPROP_STATE, false);
          ChartRedraw(0);
       }
-      else if(sparam == "RTA_BTN_BUY_050")
+      else if(sparam == "RTA_BTN_LOT_TOGGLE")
       {
-         Print("[RakutenTradeAgent] 🎯 MANUAL BUY 0.50Lot (SL: 4.0pips, TP: 15.0pips) Triggered!");
-         ExecuteOrder(OP_BUY, 0.50, 4.0, 15.0);
-         ObjectSetInteger(0, "RTA_BTN_BUY_050", OBJPROP_STATE, false);
+         // 0.10L -> 0.25L -> 0.50L -> 0.10L トグル
+         if(current_manual_lot == 0.10) current_manual_lot = 0.25;
+         else if(current_manual_lot == 0.25) current_manual_lot = 0.50;
+         else current_manual_lot = 0.10;
+
+         PrintFormat("[RakutenTradeAgent] 🔄 Manual Lot toggled to: %.2f Lot", current_manual_lot);
+         ObjectSetString(0, "RTA_BTN_LOT_TOGGLE", OBJPROP_TEXT, StringFormat("[LOT: %.2fL]", current_manual_lot));
+         ObjectSetString(0, "RTA_BTN_BUY_MANUAL", OBJPROP_TEXT, StringFormat("[+] BUY %.2fL", current_manual_lot));
+         ObjectSetString(0, "RTA_BTN_SELL_MANUAL", OBJPROP_TEXT, StringFormat("[-] SELL %.2fL", current_manual_lot));
+         ObjectSetInteger(0, "RTA_BTN_LOT_TOGGLE", OBJPROP_STATE, false);
          ChartRedraw(0);
       }
-      else if(sparam == "RTA_BTN_SELL_050")
+      else if(sparam == "RTA_BTN_BUY_MANUAL")
       {
-         Print("[RakutenTradeAgent] 🎯 MANUAL SELL 0.50Lot (SL: 4.0pips, TP: 15.0pips) Triggered!");
-         ExecuteOrder(OP_SELL, 0.50, 4.0, 15.0);
-         ObjectSetInteger(0, "RTA_BTN_SELL_050", OBJPROP_STATE, false);
+         PrintFormat("[RakutenTradeAgent] 🎯 MANUAL BUY %.2fLot (SL: 4.0pips, TP: 15.0pips) Triggered!", current_manual_lot);
+         ExecuteOrder(OP_BUY, current_manual_lot, 4.0, 15.0);
+         ObjectSetInteger(0, "RTA_BTN_BUY_MANUAL", OBJPROP_STATE, false);
+         ChartRedraw(0);
+      }
+      else if(sparam == "RTA_BTN_SELL_MANUAL")
+      {
+         PrintFormat("[RakutenTradeAgent] 🎯 MANUAL SELL %.2fLot (SL: 4.0pips, TP: 15.0pips) Triggered!", current_manual_lot);
+         ExecuteOrder(OP_SELL, current_manual_lot, 4.0, 15.0);
+         ObjectSetInteger(0, "RTA_BTN_SELL_MANUAL", OBJPROP_STATE, false);
          ChartRedraw(0);
       }
    }
@@ -444,6 +487,9 @@ void UpdateChartFibonacciOverlay()
    double fib_382 = high - (diff * 0.382);
    double fib_500 = high - (diff * 0.500);
    double fib_618 = high - (diff * 0.618);
+
+   current_fib_500 = fib_500;
+   current_fib_618 = fib_618;
 
    // 1. フィボナッチ黄金比帯 (50.0%〜61.8%) の半透明ハイライトゾーン描画
    datetime t_start = TimeCurrent() - (86400 * 5); // 5日前から
