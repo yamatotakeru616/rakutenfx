@@ -105,13 +105,13 @@ void OnTick()
 //+------------------------------------------------------------------+
 void UpdateChartHUD(string regime_str, string killswitch_str)
 {
-   CreateOrUpdateLabel("RTA_HUD_TITLE", 15, 20, "🚀 RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI]", 10, "Arial Bold", clrDeepSkyBlue);
-   CreateOrUpdateLabel("RTA_HUD_REGIME", 15, 38, StringFormat("📊 REGIME: [%s]", regime_str), 9, "Arial", clrLime);
-   CreateOrUpdateLabel("RTA_HUD_KS", 15, 54, StringFormat("🛡️ AI KILL-SWITCH: [%s]", killswitch_str), 9, "Arial", clrGold);
-   CreateOrUpdateLabel("RTA_HUD_RISK", 15, 70, "💰 RISK: 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial", clrLightCyan);
+   CreateOrUpdateLabel("RTA_HUD_TITLE", 15, 20, ">>> RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI] <<<", 10, "Arial Bold", clrDeepSkyBlue);
+   CreateOrUpdateLabel("RTA_HUD_REGIME", 15, 38, StringFormat("[REGIME] %s", regime_str), 9, "Arial Bold", clrLime);
+   CreateOrUpdateLabel("RTA_HUD_KS", 15, 54, StringFormat("[AI KILL-SWITCH] %s", killswitch_str), 9, "Arial Bold", clrGold);
+   CreateOrUpdateLabel("RTA_HUD_RISK", 15, 70, "[RISK MGMT] 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial Bold", clrLightCyan);
 
-   // 緊急全決済 (Panic Close) ボタンの描画
-   CreatePanicButton("RTA_BTN_CLOSE_ALL", 20, 20, 160, 36, "🚨 CLOSE ALL (緊急全決済)");
+   // 緊急全決済 (Panic Close) ボタンの描画 (文字化けゼロの英語表記)
+   CreatePanicButton("RTA_BTN_CLOSE_ALL", 20, 20, 170, 32, "[!] EMERGENCY CLOSE ALL");
 
    ChartRedraw(0);
 }
