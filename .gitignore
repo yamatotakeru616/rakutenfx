@@ -24,6 +24,10 @@ events.jsonl
 token-events.jsonl
 artifacts/reports/*.png
 artifacts/reports/*.svg
+artifacts/backtest_cache/
+artifacts/trades/*.png
+python/artifacts/
+*.bak.*
 
 # OS / Editor
 .DS_Store

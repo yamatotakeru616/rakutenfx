@@ -10,11 +10,18 @@ use tracing::info;
 
 use crate::models::{IncomingMessage, OutgoingMessage, SignalAction, Tick, TradeLog};
 
+#[allow(dead_code)]
+pub enum EmulationScenario {
+    RandomWalk,
+    FibonacciDowBreakout,
+}
+
 pub struct Mt4Emulator {
     server_addr: SocketAddr,
     symbol: String,
     base_price: f64,
     spread: f64,
+    scenario: EmulationScenario,
 }
 
 impl Mt4Emulator {
@@ -24,7 +31,14 @@ impl Mt4Emulator {
             symbol,
             base_price,
             spread,
+            scenario: EmulationScenario::FibonacciDowBreakout,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_scenario(mut self, scenario: EmulationScenario) -> Self {
+        self.scenario = scenario;
+        self
     }
 
     pub async fn run(&mut self, iterations: usize, interval_ms: u64) -> Result<()> {
@@ -41,13 +55,45 @@ impl Mt4Emulator {
         let mut ticket_counter = 100000i64;
         let mut active_position: Option<(i64, SignalAction, f64, f64, f64)> = None; // ticket, action, open_price, sl, tp
 
-        info!("Starting emulation loop ({} iterations)...", iterations);
+        info!("Starting emulation loop ({} iterations, scenario: {:?})...", iterations, match self.scenario {
+            EmulationScenario::RandomWalk => "RandomWalk",
+            EmulationScenario::FibonacciDowBreakout => "FibonacciDowBreakout",
+        });
 
         for i in 1..=iterations {
-            // ランダムウォークで価格変動をシミュレート
-            let raw_delta: f64 = rng.gen_range(-0.05f64..0.05f64);
-            let delta = (raw_delta * 100.0).round() / 100.0;
-            current_price = ((current_price + delta) * 1000.0).round() / 1000.0;
+            match self.scenario {
+                EmulationScenario::RandomWalk => {
+                    let raw_delta: f64 = rng.gen_range(-0.05f64..0.05f64);
+                    let delta = (raw_delta * 100.0).round() / 100.0;
+                    current_price = ((current_price + delta) * 1000.0).round() / 1000.0;
+                }
+                EmulationScenario::FibonacciDowBreakout => {
+                    let progress = (i as f64) / (iterations as f64);
+                    if progress < 0.30 {
+                        // Phase 1: 上昇トレンド形成 (154.00 -> 156.00)
+                        let step = 2.0 / (iterations as f64 * 0.30);
+                        let noise: f64 = rng.gen_range(-0.01..0.01);
+                        current_price += step + noise;
+                    } else if progress < 0.60 {
+                        // Phase 2: フィボナッチ 61.8% 押し目へ下落 (156.00 -> 154.76)
+                        let target_618 = self.base_price + (2.0 * (1.0 - 0.618));
+                        let step = (156.00 - target_618) / (iterations as f64 * 0.30);
+                        let noise: f64 = rng.gen_range(-0.01..0.01);
+                        current_price -= step + noise;
+                    } else if progress < 0.75 {
+                        // Phase 3: 下位足での揉み合い・戻り高値形成 (154.80 付近)
+                        let noise: f64 = rng.gen_range(-0.02..0.02);
+                        current_price = 154.80 + noise;
+                    } else {
+                        // Phase 4: 下位足戻り高値ブレイクアウト＆急上昇 (154.80 -> 156.50)
+                        let step = 1.70 / (iterations as f64 * 0.25);
+                        let noise: f64 = rng.gen_range(-0.005..0.015);
+                        current_price += step + noise;
+                    }
+                    current_price = (current_price * 1000.0).round() / 1000.0;
+                }
+            }
+
             let bid = current_price;
             let ask = current_price + self.spread;
 

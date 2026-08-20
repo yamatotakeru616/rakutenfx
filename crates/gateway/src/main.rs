@@ -5,6 +5,8 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod ai_client;
+mod bar_generator;
 mod db;
 mod emulator;
 mod indicators;

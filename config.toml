@@ -1,0 +1,26 @@
+# 🚀 MT4 Trading Pipeline & Rust Gateway 設定ファイル
+# 週次 Gemini 3.6 自律クオンツチューナーにより自動最適化されます。
+
+[strategy]
+short_period = 5
+long_period = 20
+rsi_period = 14
+atr_period = 14
+fib_swing_period = 50
+dow_lookback = 6
+rsi_overbought = 70.0
+rsi_oversold = 30.0
+target_risk_per_trade_jpy = 2000.0  # 1トレード許容損失額 (円)
+min_signal_interval_sec = 15
+micro_sl_min_pips = 4.0            # 極小損切り下限 (pips)
+max_lot_limit = 1.00               # 最大許容ロット
+
+[ai_kill_switch]
+enabled = true
+ipc_server_addr = "127.0.0.1:5556"
+loss_similarity_threshold = 85.0
+win_confidence_threshold = 80.0
+
+[gateway]
+bind_addr = "127.0.0.1:5555"
+db_path = "trade_pipeline.db"

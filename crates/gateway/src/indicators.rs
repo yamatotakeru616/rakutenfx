@@ -91,6 +91,45 @@ impl TechnicalIndicators {
         Some(total_range / period as f64)
     }
 
+    /// 直近N期間の最高値・最安値 (スイングハイ・スイングロー)
+    pub fn swing_high_low(&self, period: usize) -> Option<(f64, f64)> {
+        if self.prices.len() < period || period == 0 {
+            return None;
+        }
+        let slice: Vec<f64> = self.prices.iter().rev().take(period).copied().collect();
+        let mut high = f64::MIN;
+        let mut low = f64::MAX;
+
+        for &p in &slice {
+            if p > high {
+                high = p;
+            }
+            if p < low {
+                low = p;
+            }
+        }
+        Some((high, low))
+    }
+
+    /// 上昇スイングにおけるフィボナッチ・リトレースメント値の算出
+    /// (38.2%, 50.0%, 61.8%, 78.6%)
+    pub fn fibonacci_retracement_up(&self, period: usize) -> Option<FibonacciLevels> {
+        let (high, low) = self.swing_high_low(period)?;
+        let diff = high - low;
+        if diff <= 0.0 {
+            return None;
+        }
+
+        Some(FibonacciLevels {
+            high,
+            low,
+            level_382: high - (diff * 0.382),
+            level_500: high - (diff * 0.500),
+            level_618: high - (diff * 0.618),
+            level_786: high - (diff * 0.786),
+        })
+    }
+
     #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.prices.len()
@@ -100,6 +139,16 @@ impl TechnicalIndicators {
     pub fn is_empty(&self) -> bool {
         self.prices.is_empty()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FibonacciLevels {
+    pub high: f64,
+    pub low: f64,
+    pub level_382: f64,
+    pub level_500: f64,
+    pub level_618: f64,
+    pub level_786: f64,
 }
 
 #[cfg(test)]
@@ -134,5 +183,19 @@ mod tests {
         }
         let atr = ind.atr(4).unwrap();
         assert!(atr > 0.0);
+    }
+
+    #[test]
+    fn test_fibonacci_retracement() {
+        let mut ind = TechnicalIndicators::new(20);
+        // 安値 100.0 から 高値 110.0 への上昇スイング (値幅 10.0)
+        for p in [100.0, 102.0, 105.0, 108.0, 110.0, 105.0] {
+            ind.add_price(p);
+        }
+        let fib = ind.fibonacci_retracement_up(6).unwrap();
+        assert_eq!(fib.high, 110.0);
+        assert_eq!(fib.low, 100.0);
+        assert!((fib.level_500 - 105.0).abs() < 1e-6);
+        assert!((fib.level_618 - 103.82).abs() < 1e-6);
     }
 }

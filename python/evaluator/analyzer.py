@@ -41,20 +41,24 @@ class TradeAnalyzer:
         self.db_path = db_path
 
     def load_trades(self, limit: Optional[int] = None) -> List[TradeRecord]:
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        query = """
-            SELECT ticket, symbol, action, lots, open_price, close_price, open_time, close_time, profit, comment
-            FROM trades
-            WHERE close_time IS NOT NULL
-            ORDER BY close_time ASC
-        """
-        if limit:
-            query += f" LIMIT {limit}"
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            query = """
+                SELECT ticket, symbol, action, lots, open_price, close_price, open_time, close_time, profit, comment
+                FROM trades
+                WHERE close_time IS NOT NULL
+                ORDER BY close_time ASC
+            """
+            if limit:
+                query += f" LIMIT {limit}"
 
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        conn.close()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            conn.close()
+        except Exception as e:
+            # テーブルが存在しないかロックされている場合は空リスト
+            return []
 
         trades = []
         for r in rows:
