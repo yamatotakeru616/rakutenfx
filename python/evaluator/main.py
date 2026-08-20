@@ -11,7 +11,7 @@ if sys.platform == "win32":
         pass
 
 from ai_agent import TradeAiAgent
-from analyzer import TradeAnalyzer
+from analyzer import TradeAnalyzer, TradeRecord, TradeMetrics
 from charts import ChartGenerator
 from notifier import DiscordNotifier
 
