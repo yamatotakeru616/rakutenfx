@@ -1,0 +1,58 @@
+name: Quant Pipeline CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  rust-test:
+    name: Rust Gateway Tests & Build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./crates/gateway -> target"
+
+      - name: Run Cargo Tests (M1 Bar, Dow Breakout, Fibonacci, ATR, RSI)
+        run: cargo test --workspace --verbose
+
+      - name: Build Release Binary
+        run: cargo build --release --workspace
+
+  python-test:
+    name: Python AI Evaluator & DuckDB Tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/evaluator/requirements.txt
+          pip install duckdb numpy pillow
+
+      - name: Verify DuckDB OLAP Backtest & AI Kill-Switch Engine
+        run: |
+          python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); from evaluator.duckdb_backtest import DuckDBBacktestEngine, RealtimeRegimeDetector; from evaluator.embedding_search import ChartEmbeddingSearchEngine; emb = ChartEmbeddingSearchEngine(); duck = DuckDBBacktestEngine(); duck.load_simulated_dataset(200); count = duck.generate_and_index_pattern_dataset(emb); print(f'Successfully tested DuckDB pipeline: {count} patterns indexed.'); reg = RealtimeRegimeDetector(); reg.push_tick('USDJPY', 155.0, 155.004); print('Regime detector initialized successfully!')"
+        working-directory: python
+
+      - name: Verify Gemini Auto-Tuner & Charts Dashboard Engine
+        run: |
+          python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); from evaluator.auto_tuner import GeminiAutoTuner; from evaluator.charts import ChartGenerator; tuner = GeminiAutoTuner(); print('AutoTuner & Charts module verified successfully!')"
+        working-directory: python
