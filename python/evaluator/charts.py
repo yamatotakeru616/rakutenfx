@@ -137,8 +137,17 @@ class ChartGenerator:
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MT4 AI Trading Performance Dashboard</title>
+    
+    <!-- PWA & Mobile App Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#090d16">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="楽天FX AI">
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
     <style>
         :root {{
             --bg-primary: #090d16;
@@ -313,6 +322,17 @@ class ChartGenerator:
             </div>
         </section>
     </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {{
+            window.addEventListener('load', () => {{
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
+                    .catch(err => console.log('PWA ServiceWorker registration failed:', err));
+            }});
+        }}
+    </script>
 </body>
 </html>
 """
