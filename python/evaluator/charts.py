@@ -159,6 +159,19 @@ class ChartGenerator:
             --accent-green: #34d399;
             --accent-red: #f87171;
             --accent-gold: #fbbf24;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }}
+        [data-theme="cyber"] {{
+            --bg-primary: #050b14;
+            --bg-card: #0c182b;
+            --border-color: #00f0ff33;
+            --text-primary: #e0f2fe;
+            --text-secondary: #7dd3fc;
+            --accent-cyan: #00f0ff;
+            --accent-green: #00ff88;
+            --accent-red: #ff3366;
+            --accent-gold: #ffd700;
+            --card-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
@@ -167,6 +180,7 @@ class ChartGenerator:
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             padding: 24px;
             line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
         header {{
@@ -180,15 +194,79 @@ class ChartGenerator:
             gap: 12px;
         }}
         h1 {{ font-size: 22px; font-weight: 700; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px; }}
-        .badge-live {{
-            background: rgba(52, 211, 153, 0.15);
+        
+        .header-controls {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
+
+        /* ライブパルス点滅インジケータ */
+        .live-indicator {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(52, 211, 153, 0.12);
             color: var(--accent-green);
-            border: 1px solid var(--accent-green);
-            padding: 4px 10px;
+            border: 1px solid rgba(52, 211, 153, 0.4);
+            padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
-            font-weight: bold;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }}
+        .pulse-dot {{
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+            animation: pulse-animation 1.8s infinite;
+        }}
+        @keyframes pulse-animation {{
+            0% {{
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+            }}
+            70% {{
+                transform: scale(1);
+                box-shadow: 0 0 0 8px rgba(52, 211, 153, 0);
+            }}
+            100% {{
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+            }}
+        }}
+
+        /* 自動リフレッシュカウントダウン */
+        .refresh-tag {{
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }}
+
+        /* テーマ切替ボタン */
+        .theme-btn {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--accent-cyan);
+            padding: 5px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }}
+        .theme-btn:hover {{
+            background: var(--border-color);
+            transform: translateY(-1px);
+        }}
+
         .metrics-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -200,8 +278,11 @@ class ChartGenerator:
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 16px;
+            box-shadow: var(--card-shadow);
             backdrop-filter: blur(10px);
+            transition: transform 0.2s ease;
         }}
+        .stat-card:hover {{ transform: translateY(-2px); }}
         .stat-label {{ font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }}
         .stat-value {{ font-size: 24px; font-weight: 700; margin-top: 4px; }}
         .val-positive {{ color: var(--accent-green); }}
@@ -222,6 +303,7 @@ class ChartGenerator:
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 20px;
+            box-shadow: var(--card-shadow);
         }}
         .card h2 {{ font-size: 18px; margin-bottom: 16px; color: var(--text-primary); border-left: 4px solid var(--accent-cyan); padding-left: 8px; }}
         .chart-img {{ width: 100%; border-radius: 8px; display: block; }}
@@ -278,12 +360,20 @@ class ChartGenerator:
 <body>
     <div class="container">
         <header>
-            <h1>🚀 楽天MT4 AIクオンツ パイプライン ダッシュボード</h1>
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="badge-live">● LIVE ONLINE</span>
-                <span style="font-size: 13px; color: var(--text-secondary);">最終更新: {last_close_time}</span>
+            <h1>🚀 楽天MT4 AIクオンツ パイプライン</h1>
+            <div class="header-controls">
+                <div class="live-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>LIVE PIPELINE</span>
+                </div>
+                <span class="refresh-tag" id="refreshTimer">🔄 自動更新: 60s</span>
+                <button class="theme-btn" onclick="toggleTheme()">🎨 テーマ切替</button>
             </div>
         </header>
+
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; text-align: right;">
+            最終データ確定日時: <strong>{last_close_time}</strong>
+        </div>
 
         <section class="metrics-grid">
             <div class="stat-card">
@@ -292,7 +382,7 @@ class ChartGenerator:
             </div>
             <div class="stat-card">
                 <div class="stat-label">勝率 (Win Rate)</div>
-                <div class="stat-value val-cyan">{metrics.win_rate:.1f}% <span style="font-size: 14px; color: var(--text-secondary);">({metrics.winning_trades}勝 {metrics.losing_trades}敗)</span></div>
+                <div class="stat-value val-cyan">{metrics.win_rate:.1f}% <span style="font-size: 13px; color: var(--text-secondary);">({metrics.winning_trades}勝 {metrics.losing_trades}敗)</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">プロフィットファクター (PF)</div>
@@ -323,8 +413,9 @@ class ChartGenerator:
         </section>
     </div>
 
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA & Live Refresh Scripts -->
     <script>
+        // PWA サービスワーカー登録
         if ('serviceWorker' in navigator) {{
             window.addEventListener('load', () => {{
                 navigator.serviceWorker.register('./service-worker.js')
@@ -332,6 +423,33 @@ class ChartGenerator:
                     .catch(err => console.log('PWA ServiceWorker registration failed:', err));
             }});
         }}
+
+        // テーマ切り替え (Dark ⇄ Cyber)
+        function toggleTheme() {{
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'cyber' ? 'dark' : 'cyber';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('rakuten_theme', next);
+        }}
+
+        // 保存されたテーマの復元
+        const savedTheme = localStorage.getItem('rakuten_theme');
+        if (savedTheme) {{
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }}
+
+        // 60秒自動リフレッシュタイマー
+        let countdown = 60;
+        const timerElem = document.getElementById('refreshTimer');
+        setInterval(() => {{
+            countdown--;
+            if (timerElem) {{
+                timerElem.innerText = `🔄 自動更新: ${{countdown}}s`;
+            }}
+            if (countdown <= 0) {{
+                window.location.reload();
+            }}
+        }}, 1000);
     </script>
 </body>
 </html>

@@ -109,6 +109,51 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
    CreateOrUpdateLabel("RTA_HUD_REGIME", 15, 38, StringFormat("📊 REGIME: [%s]", regime_str), 9, "Arial", clrLime);
    CreateOrUpdateLabel("RTA_HUD_KS", 15, 54, StringFormat("🛡️ AI KILL-SWITCH: [%s]", killswitch_str), 9, "Arial", clrGold);
    CreateOrUpdateLabel("RTA_HUD_RISK", 15, 70, "💰 RISK: 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial", clrLightCyan);
+
+   // 緊急全決済 (Panic Close) ボタンの描画
+   CreatePanicButton("RTA_BTN_CLOSE_ALL", 20, 20, 160, 36, "🚨 CLOSE ALL (緊急全決済)");
+}
+
+//+------------------------------------------------------------------+
+//| Helper to create Emergency Panic Close Button                    |
+//+------------------------------------------------------------------+
+void CreatePanicButton(string name, int x, int y, int width, int height, string text)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   }
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x + width);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
+   ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clrWhite);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrCrimson);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, clrDarkRed);
+   ObjectSetInteger(0, name, OBJPROP_STATE, false);
+}
+
+//+------------------------------------------------------------------+
+//| Chart Event handler (Handle Button Click)                        |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   if(id == CHARTEVENT_OBJECT_CLICK)
+   {
+      if(sparam == "RTA_BTN_CLOSE_ALL")
+      {
+         Print("[RakutenTradeAgent] 🚨 EMERGENCY CLOSE ALL BUTTON CLICKED! Closing all positions...");
+         CloseAllPositions();
+         
+         // ボタンを非アクティブ状態に戻す
+         ObjectSetInteger(0, "RTA_BTN_CLOSE_ALL", OBJPROP_STATE, false);
+         ChartRedraw(0);
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
