@@ -29,6 +29,7 @@ input int    MagicNumber = 888888;      // Magic Number
 input int    Slippage    = 3;           // Slippage (points)
 input bool   EnableAutoTrade = true;    // Enable Auto Demo Trade
 input bool   EnableVisualOverlay = true;// Enable Visual Fibonacci & Dow Overlay
+input ENUM_TIMEFRAMES FibTimeFrame = PERIOD_H1; // Fibonacci Higher-Timeframe
 input int    FibLookbackBars = 50;      // Fibonacci Lookback Bars (H1/M15/M5)
 
 // Global Variables
@@ -40,6 +41,7 @@ datetime last_fib_update = 0;
 void UpdateChartHUD(string regime_str, string killswitch_str);
 void UpdateChartFibonacciOverlay();
 void CreateOrUpdateRectLabel(string name, int x, int y, int width, int height, color bg_clr, color border_clr);
+void CreateOrUpdateZoneRect(string name, datetime time1, double price1, datetime time2, double price2, color bg_clr);
 void CreateOrUpdateLabel(string name, int x, int y, string text, int font_size, string font_name, color clr);
 void CreateButton(string name, int x, int y, int width, int height, string text, color bg_clr, color border_clr);
 void CreateOrUpdateHLine(string name, double price, color clr, int style, int width, string desc);
@@ -393,21 +395,49 @@ void CreateOrUpdateLabel(string name, int x, int y, string text, int font_size, 
 }
 
 //+------------------------------------------------------------------+
-//| Update Fibonacci & Dow Breakout Visual Overlay on Chart          |
+//| Helper to create or move Rectangle Zone on Chart                 |
+//+------------------------------------------------------------------+
+void CreateOrUpdateZoneRect(string name, datetime time1, double price1, datetime time2, double price2, color bg_clr)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_RECTANGLE, 0, time1, price1, time2, price2);
+   }
+   else
+   {
+      ObjectSetInteger(0, name, OBJPROP_TIME1, time1);
+      ObjectSetDouble(0, name, OBJPROP_PRICE1, price1);
+      ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
+      ObjectSetDouble(0, name, OBJPROP_PRICE2, price2);
+   }
+   ObjectSetInteger(0, name, OBJPROP_COLOR, bg_clr);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bg_clr);
+   ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景に敷く
+   ObjectSetInteger(0, name, OBJPROP_FILL, true);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
+}
+
+//+------------------------------------------------------------------+
+//| Update Fibonacci & Dow Breakout Visual Overlay on Chart (MTF)    |
 //+------------------------------------------------------------------+
 void UpdateChartFibonacciOverlay()
 {
-   int bars_total = iBars(Symbol(), 0);
+   // 上位足 (H1 / M15) からスイング高安値を自動逆算
+   ENUM_TIMEFRAMES htf = FibTimeFrame;
+   if(Period() >= PERIOD_H1) htf = PERIOD_CURRENT;
+
+   int bars_total = iBars(Symbol(), htf);
    if(bars_total < 10) return;
 
    int lookback = MathMin(FibLookbackBars, bars_total - 2);
-   int highest_bar = iHighest(Symbol(), 0, MODE_HIGH, lookback, 1);
-   int lowest_bar  = iLowest(Symbol(), 0, MODE_LOW, lookback, 1);
+   int highest_bar = iHighest(Symbol(), htf, MODE_HIGH, lookback, 1);
+   int lowest_bar  = iLowest(Symbol(), htf, MODE_LOW, lookback, 1);
 
    if(highest_bar < 0 || lowest_bar < 0) return;
 
-   double high = High[highest_bar];
-   double low  = Low[lowest_bar];
+   double high = iHigh(Symbol(), htf, highest_bar);
+   double low  = iLow(Symbol(), htf, lowest_bar);
    double diff = high - low;
    if(diff <= 0) return;
 
@@ -415,15 +445,19 @@ void UpdateChartFibonacciOverlay()
    double fib_500 = high - (diff * 0.500);
    double fib_618 = high - (diff * 0.618);
 
-   // 38.2% ライン ＆ 価格テキスト
-   CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, StringFormat("FR 38.2%% (%.3f)", fib_382));
-   // 50.0% ライン (半値) ＆ 価格テキスト
-   CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, StringFormat("FR 50.0%% Equilibrium (%.3f)", fib_500));
-   // 61.8% ライン (黄金比) ＆ 価格テキスト
-   CreateOrUpdateHLine("RTA_FIB_618", fib_618, clrOrangeRed, STYLE_SOLID, 2, StringFormat("FR 61.8%% Golden Zone (%.3f)", fib_618));
+   // 1. フィボナッチ黄金比帯 (50.0%〜61.8%) の半透明ハイライトゾーン描画
+   datetime t_start = TimeCurrent() - (86400 * 5); // 5日前から
+   datetime t_end   = TimeCurrent() + (86400 * 2); // 2日先まで
+   CreateOrUpdateZoneRect("RTA_FIB_GOLDEN_ZONE", t_start, fib_500, t_end, fib_618, C'20,35,55');
 
-   // 直近戻り高値・押し安値 (直近10本)
-   int dow_lookback = MathMin(10, bars_total - 2);
+   // 2. 38.2% / 50.0% / 61.8% ライン ＆ 価格テキスト
+   CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, StringFormat("HTF FR 38.2%% (%.3f)", fib_382));
+   CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, StringFormat("HTF FR 50.0%% Equilibrium (%.3f)", fib_500));
+   CreateOrUpdateHLine("RTA_FIB_618", fib_618, clrOrangeRed, STYLE_SOLID, 2, StringFormat("HTF FR 61.8%% Golden Zone (%.3f)", fib_618));
+
+   // 3. 現在足の直近戻り高値・押し安値 (直近10本)
+   int current_bars = iBars(Symbol(), 0);
+   int dow_lookback = MathMin(10, current_bars - 2);
    int recent_h_bar = iHighest(Symbol(), 0, MODE_HIGH, dow_lookback, 1);
    int recent_l_bar = iLowest(Symbol(), 0, MODE_LOW, dow_lookback, 1);
    if(recent_h_bar >= 0 && recent_l_bar >= 0)
