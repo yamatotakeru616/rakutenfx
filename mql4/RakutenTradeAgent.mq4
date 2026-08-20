@@ -105,15 +105,85 @@ void OnTick()
 //+------------------------------------------------------------------+
 void UpdateChartHUD(string regime_str, string killswitch_str)
 {
-   CreateOrUpdateLabel("RTA_HUD_TITLE", 15, 20, ">>> RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI] <<<", 10, "Arial Bold", clrDeepSkyBlue);
-   CreateOrUpdateLabel("RTA_HUD_REGIME", 15, 38, StringFormat("[REGIME] %s", regime_str), 9, "Arial Bold", clrLime);
-   CreateOrUpdateLabel("RTA_HUD_KS", 15, 54, StringFormat("[AI KILL-SWITCH] %s", killswitch_str), 9, "Arial Bold", clrGold);
-   CreateOrUpdateLabel("RTA_HUD_RISK", 15, 70, "[RISK MGMT] 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial Bold", clrLightCyan);
+   // 1. 半透明ダーク背景パネルの描画
+   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 400, 92, C'10,15,28', C'34,47,76');
 
-   // 緊急全決済 (Panic Close) ボタンの描画 (文字化けゼロの英語表記)
+   // 2. HUD テキストの描画
+   CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI] <<<", 10, "Arial Bold", clrDeepSkyBlue);
+   CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[REGIME] %s", regime_str), 9, "Arial Bold", clrLime);
+   CreateOrUpdateLabel("RTA_HUD_KS", 18, 50, StringFormat("[AI KILL-SWITCH] %s", killswitch_str), 9, "Arial Bold", clrGold);
+   CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, "[RISK MGMT] 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial Bold", clrLightCyan);
+
+   // 3. リアルタイム獲得pips・含み損益メーターの計算＆表示
+   double pip_size = (Digits == 3 || Digits == 5) ? Point * 10 : Point;
+   if(StringFind(Symbol(), "XAU") >= 0 || StringFind(Symbol(), "GOLD") >= 0) pip_size = 0.1;
+
+   bool has_position = false;
+   double total_pips = 0.0;
+   double total_profit = 0.0;
+   double active_lot = 0.0;
+   string pos_type = "";
+
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
+         {
+            has_position = true;
+            active_lot += OrderLots();
+            total_profit += (OrderProfit() + OrderSwap());
+            if(OrderType() == OP_BUY)
+            {
+               pos_type = "BUY";
+               total_pips = (Bid - OrderOpenPrice()) / pip_size;
+            }
+            else if(OrderType() == OP_SELL)
+            {
+               pos_type = "SELL";
+               total_pips = (OrderOpenPrice() - Ask) / pip_size;
+            }
+         }
+      }
+   }
+
+   if(has_position)
+   {
+      color pnl_clr = (total_profit >= 0) ? clrLime : clrCrimson;
+      string pnl_str = StringFormat("[OPEN PnL] %s %.2fLot | %+0.1f pips (%+0.0f JPY)", pos_type, active_lot, total_pips, total_profit);
+      CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, pnl_str, 9, "Arial Bold", pnl_clr);
+   }
+   else
+   {
+      CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (No Active Position)", 9, "Arial Bold", clrDarkGray);
+   }
+
+   // 4. 緊急全決済 (Panic Close) ボタンの描画
    CreatePanicButton("RTA_BTN_CLOSE_ALL", 20, 20, 170, 32, "[!] EMERGENCY CLOSE ALL");
 
    ChartRedraw(0);
+}
+
+//+------------------------------------------------------------------+
+//| Helper to create or move Rectangle Background Panel              |
+//+------------------------------------------------------------------+
+void CreateOrUpdateRectLabel(string name, int x, int y, int width, int height, color bg_clr, color border_clr)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   }
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
+   ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bg_clr);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, border_clr);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
 }
 
 //+------------------------------------------------------------------+
@@ -204,12 +274,12 @@ void UpdateChartFibonacciOverlay()
    double fib_500 = high - (diff * 0.500);
    double fib_618 = high - (diff * 0.618);
 
-   // 38.2% ライン
-   CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, "FR 38.2% (Shallow Pullback)");
-   // 50.0% ライン (半値)
-   CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, "FR 50.0% (Equilibrium)");
-   // 61.8% ライン (黄金比)
-   CreateOrUpdateHLine("RTA_FIB_618", fib_618, clrOrangeRed, STYLE_SOLID, 2, "FR 61.8% (Golden Ratio Entry)");
+   // 38.2% ライン ＆ 価格テキスト
+   CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, StringFormat("FR 38.2%% (%.3f)", fib_382));
+   // 50.0% ライン (半値) ＆ 価格テキスト
+   CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, StringFormat("FR 50.0%% Equilibrium (%.3f)", fib_500));
+   // 61.8% ライン (黄金比) ＆ 価格テキスト
+   CreateOrUpdateHLine("RTA_FIB_618", fib_618, clrOrangeRed, STYLE_SOLID, 2, StringFormat("FR 61.8%% Golden Zone (%.3f)", fib_618));
 
    // 直近戻り高値・押し安値 (直近10本)
    int dow_lookback = MathMin(10, bars_total - 2);
@@ -217,8 +287,8 @@ void UpdateChartFibonacciOverlay()
    int recent_l_bar = iLowest(Symbol(), 0, MODE_LOW, dow_lookback, 1);
    if(recent_h_bar >= 0 && recent_l_bar >= 0)
    {
-      CreateOrUpdateHLine("RTA_DOW_RES", High[recent_h_bar], clrMagenta, STYLE_DOT, 1, "Dow Swing High (Breakout Target)");
-      CreateOrUpdateHLine("RTA_DOW_SUP", Low[recent_l_bar], clrLime, STYLE_DOT, 1, "Dow Swing Low (Micro-SL Level)");
+      CreateOrUpdateHLine("RTA_DOW_RES", High[recent_h_bar], clrMagenta, STYLE_DOT, 1, StringFormat("Dow Swing High (%.3f)", High[recent_h_bar]));
+      CreateOrUpdateHLine("RTA_DOW_SUP", Low[recent_l_bar], clrLime, STYLE_DOT, 1, StringFormat("Dow Swing Low (%.3f)", Low[recent_l_bar]));
    }
 
    ChartRedraw(0);
