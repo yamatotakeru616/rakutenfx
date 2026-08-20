@@ -96,7 +96,10 @@ void OnTick()
       ProcessServerResponse(response);
    }
 
-   // 2. Check and send closed orders log
+   // 2. 自動トレーリングストップ判定 (+10pips利益でM1スイング追従)
+   AutoTrailingStop();
+
+   // 3. Check and send closed orders log
    CheckClosedOrders();
 }
 
@@ -158,38 +161,17 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (No Active Position)", 9, "Arial Bold", clrDarkGray);
    }
 
-   // 4. 緊急全決済 (Panic Close) ボタンの描画
-   CreatePanicButton("RTA_BTN_CLOSE_ALL", 20, 20, 170, 32, "[!] EMERGENCY CLOSE ALL");
+   // 4. ボタン群の描画 (緊急全決済 & 建値ロック)
+   CreateButton("RTA_BTN_CLOSE_ALL", 20, 15, 170, 30, "[!] EMERGENCY CLOSE ALL", clrCrimson, clrDarkRed);
+   CreateButton("RTA_BTN_BE_LOCK", 20, 48, 170, 28, "[LOCK] BE LOCK (建値固定)", C'13,148,136', C'15,118,110');
 
    ChartRedraw(0);
 }
 
 //+------------------------------------------------------------------+
-//| Helper to create or move Rectangle Background Panel              |
+//| Helper to create Custom Button                                   |
 //+------------------------------------------------------------------+
-void CreateOrUpdateRectLabel(string name, int x, int y, int width, int height, color bg_clr, color border_clr)
-{
-   if(ObjectFind(0, name) < 0)
-   {
-      ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   }
-   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
-   ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
-   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bg_clr);
-   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, border_clr);
-   ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-   ObjectSetInteger(0, name, OBJPROP_BACK, false);
-   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-   ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
-}
-
-//+------------------------------------------------------------------+
-//| Helper to create Emergency Panic Close Button                    |
-//+------------------------------------------------------------------+
-void CreatePanicButton(string name, int x, int y, int width, int height, string text)
+void CreateButton(string name, int x, int y, int width, int height, string text, color bg_clr, color border_clr)
 {
    if(ObjectFind(0, name) < 0)
    {
@@ -202,10 +184,10 @@ void CreatePanicButton(string name, int x, int y, int width, int height, string 
    ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
    ObjectSetString(0, name, OBJPROP_TEXT, text);
    ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
-   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
    ObjectSetInteger(0, name, OBJPROP_COLOR, clrWhite);
-   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrCrimson);
-   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, clrDarkRed);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bg_clr);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, border_clr);
    ObjectSetInteger(0, name, OBJPROP_STATE, false);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
@@ -222,10 +204,112 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       {
          Print("[RakutenTradeAgent] 🚨 EMERGENCY CLOSE ALL BUTTON CLICKED! Closing all positions...");
          CloseAllPositions();
-         
-         // ボタンを非アクティブ状態に戻す
          ObjectSetInteger(0, "RTA_BTN_CLOSE_ALL", OBJPROP_STATE, false);
          ChartRedraw(0);
+      }
+      else if(sparam == "RTA_BTN_BE_LOCK")
+      {
+         Print("[RakutenTradeAgent] 🔒 BE LOCK BUTTON CLICKED! Moving SL to Break-Even +0.5pips...");
+         MoveStopLossToBreakEven();
+         ObjectSetInteger(0, "RTA_BTN_BE_LOCK", OBJPROP_STATE, false);
+         ChartRedraw(0);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Move StopLoss of all open positions to Break-Even (+0.5pips)     |
+//+------------------------------------------------------------------+
+void MoveStopLossToBreakEven()
+{
+   double pip_size = (Digits == 3 || Digits == 5) ? Point * 10 : Point;
+   if(StringFind(Symbol(), "XAU") >= 0 || StringFind(Symbol(), "GOLD") >= 0) pip_size = 0.1;
+
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
+         {
+            double open_price = OrderOpenPrice();
+            double current_sl = OrderStopLoss();
+            double new_sl = 0;
+
+            if(OrderType() == OP_BUY)
+            {
+               new_sl = open_price + (0.5 * pip_size); // 建値 +0.5pips
+               if(current_sl < new_sl && Bid > new_sl + (1.0 * pip_size))
+               {
+                  bool res = OrderModify(OrderTicket(), open_price, new_sl, OrderTakeProfit(), 0, clrLime);
+                  if(res) PrintFormat("[RakutenTradeAgent] 🔒 BUY #%d SL moved to Break-Even: %.5f", OrderTicket(), new_sl);
+               }
+            }
+            else if(OrderType() == OP_SELL)
+            {
+               new_sl = open_price - (0.5 * pip_size); // 建値 -0.5pips
+               if((current_sl == 0 || current_sl > new_sl) && Ask < new_sl - (1.0 * pip_size))
+               {
+                  bool res = OrderModify(OrderTicket(), open_price, new_sl, OrderTakeProfit(), 0, clrCrimson);
+                  if(res) PrintFormat("[RakutenTradeAgent] 🔒 SELL #%d SL moved to Break-Even: %.5f", OrderTicket(), new_sl);
+               }
+            }
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Auto-Trailing Stop (+10pips profit -> Trail M1 Swings)           |
+//+------------------------------------------------------------------+
+void AutoTrailingStop()
+{
+   double pip_size = (Digits == 3 || Digits == 5) ? Point * 10 : Point;
+   if(StringFind(Symbol(), "XAU") >= 0 || StringFind(Symbol(), "GOLD") >= 0) pip_size = 0.1;
+
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
+         {
+            double open_price = OrderOpenPrice();
+            double current_sl = OrderStopLoss();
+
+            if(OrderType() == OP_BUY)
+            {
+               double profit_pips = (Bid - open_price) / pip_size;
+               if(profit_pips >= 10.0) // +10pips以上でトレーリング開始
+               {
+                  int lowest_bar = iLowest(Symbol(), 0, MODE_LOW, 3, 1);
+                  if(lowest_bar >= 0)
+                  {
+                     double trail_sl = Low[lowest_bar] - (1.0 * pip_size);
+                     if(trail_sl > current_sl && trail_sl < Bid - (2.0 * pip_size))
+                     {
+                        bool res = OrderModify(OrderTicket(), open_price, trail_sl, OrderTakeProfit(), 0, clrDodgerBlue);
+                        if(res) PrintFormat("[RakutenTradeAgent] 📈 BUY #%d Trailing SL updated: %.5f (+%.1fpips profit)", OrderTicket(), trail_sl, profit_pips);
+                     }
+                  }
+               }
+            }
+            else if(OrderType() == OP_SELL)
+            {
+               double profit_pips = (open_price - Ask) / pip_size;
+               if(profit_pips >= 10.0) // +10pips以上でトレーリング開始
+               {
+                  int highest_bar = iHighest(Symbol(), 0, MODE_HIGH, 3, 1);
+                  if(highest_bar >= 0)
+                  {
+                     double trail_sl = High[highest_bar] + (1.0 * pip_size);
+                     if((current_sl == 0 || trail_sl < current_sl) && trail_sl > Ask + (2.0 * pip_size))
+                     {
+                        bool res = OrderModify(OrderTicket(), open_price, trail_sl, OrderTakeProfit(), 0, clrDodgerBlue);
+                        if(res) PrintFormat("[RakutenTradeAgent] 📉 SELL #%d Trailing SL updated: %.5f (+%.1fpips profit)", OrderTicket(), trail_sl, profit_pips);
+                     }
+                  }
+               }
+            }
+         }
       }
    }
 }

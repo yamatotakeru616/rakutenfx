@@ -1,0 +1,200 @@
+{
+  "backtest_200000_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200000_LOSS.png"
+  },
+  "backtest_200001_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200001_WIN.png"
+  },
+  "backtest_200002_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200002_WIN.png"
+  },
+  "backtest_200003_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200003_LOSS.png"
+  },
+  "backtest_200004_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200004_WIN.png"
+  },
+  "backtest_200005_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200005_WIN.png"
+  },
+  "backtest_200006_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200006_LOSS.png"
+  },
+  "backtest_200007_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200007_WIN.png"
+  },
+  "backtest_200008_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200008_WIN.png"
+  },
+  "backtest_200009_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200009_LOSS.png"
+  },
+  "backtest_200010_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200010_WIN.png"
+  },
+  "backtest_200011_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200011_WIN.png"
+  },
+  "backtest_200012_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200012_LOSS.png"
+  },
+  "backtest_200013_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200013_WIN.png"
+  },
+  "backtest_200014_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200014_WIN.png"
+  },
+  "backtest_200015_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200015_LOSS.png"
+  },
+  "backtest_200016_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200016_WIN.png"
+  },
+  "backtest_200017_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200017_WIN.png"
+  },
+  "backtest_200018_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200018_LOSS.png"
+  },
+  "backtest_200019_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200019_WIN.png"
+  },
+  "backtest_200020_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200020_WIN.png"
+  },
+  "backtest_200021_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200021_LOSS.png"
+  },
+  "backtest_200022_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200022_WIN.png"
+  },
+  "backtest_200023_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200023_WIN.png"
+  },
+  "backtest_200024_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200024_LOSS.png"
+  },
+  "backtest_200025_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200025_WIN.png"
+  },
+  "backtest_200026_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200026_WIN.png"
+  },
+  "backtest_200027_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200027_LOSS.png"
+  },
+  "backtest_200028_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200028_WIN.png"
+  },
+  "backtest_200029_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200029_WIN.png"
+  },
+  "backtest_200030_LOSS.png": {
+    "is_win": false,
+    "profit": -1800.0,
+    "pattern_tag": "FIB_FAKE_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200030_LOSS.png"
+  },
+  "backtest_200031_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200031_WIN.png"
+  },
+  "backtest_200032_WIN.png": {
+    "is_win": true,
+    "profit": 3500.0,
+    "pattern_tag": "FIB_618_DOW_BREAKOUT",
+    "image_path": "artifacts/backtest_cache\\backtest_200032_WIN.png"
+  }
+}
