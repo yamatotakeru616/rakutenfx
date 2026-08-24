@@ -265,7 +265,9 @@ async function runOneYearBacktest() {
         });
         if (!res.ok) throw new Error('Backtest failed');
         const data = await res.json();
+        if (data.run_id) currentViewingRunId = data.run_id;
         updateBacktestUI(data.result, data.ai_report);
+        fetchBacktestHistory();
     } catch (err) {
         alert('バックテスト実行エラー: ' + err.message);
     } finally {
@@ -386,6 +388,8 @@ function renderGridRankings(rankings) {
 }
 
 // Fetch and Render Past Backtest DB Runs
+let currentViewingRunId = null;
+
 async function fetchBacktestHistory() {
     try {
         const res = await fetch('/api/backtest/history');
@@ -409,6 +413,10 @@ function renderBacktestHistory(runs) {
 
     runs.forEach(r => {
         const tr = document.createElement('tr');
+        tr.className = `clickable-row ${currentViewingRunId === r.id ? 'selected-run-row' : ''}`;
+        tr.title = 'クリックしてこのバックテストの資産曲線・約定ログ・AI診断を画面に復元';
+        tr.onclick = () => loadBacktestRunDetail(r.id);
+
         let paramsText = '';
         try {
             const p = JSON.parse(r.params_json);
@@ -421,7 +429,7 @@ function renderBacktestHistory(runs) {
         const pfHighlight = r.profit_factor >= 1.30 ? 'style="color: var(--accent-gold); font-weight: bold;"' : '';
 
         tr.innerHTML = `
-            <td>#${r.id}</td>
+            <td>#${r.id} ${currentViewingRunId === r.id ? '👁️' : ''}</td>
             <td style="font-size: 11px; color: var(--text-muted);">${dateStr}</td>
             <td><strong>${r.symbol}</strong></td>
             <td style="color: var(--accent-cyan); font-weight: 700;">${r.robustness_score.toFixed(1)}</td>
@@ -434,6 +442,76 @@ function renderBacktestHistory(runs) {
         `;
         tbody.appendChild(tr);
     });
+}
+
+// Load and restore a historical backtest run into the dashboard
+async function loadBacktestRunDetail(runId) {
+    currentViewingRunId = runId;
+    try {
+        const res = await fetch(`/api/backtest/run/${runId}`);
+        if (!res.ok) throw new Error('Failed to load run details');
+        const data = await res.json();
+        const r = data.run;
+        const p = data.params;
+
+        // Restore KPI Ribbon
+        document.getElementById('bt-kpi-profit').textContent = `${r.total_profit >= 0 ? '+' : ''}¥${r.total_profit.toLocaleString()}`;
+        document.getElementById('bt-kpi-win-rate').textContent = `${r.win_rate.toFixed(1)}%`;
+        document.getElementById('bt-kpi-trades-count').textContent = `${r.total_trades}戦 (復元: Run #${r.id})`;
+        document.getElementById('bt-kpi-pf').textContent = r.profit_factor.toFixed(2);
+        document.getElementById('bt-kpi-max-dd').textContent = `¥${r.max_drawdown.toLocaleString()} (${r.max_drawdown_pct.toFixed(1)}%)`;
+
+        // Restore Equity Curve Chart
+        if (data.equity_curve && backtestEquityChart) {
+            const labels = data.equity_curve.map(pt => pt.time.split('T')[0]);
+            const points = data.equity_curve.map(pt => pt.equity);
+            backtestEquityChart.data.labels = labels;
+            backtestEquityChart.data.datasets[0].data = points;
+            backtestEquityChart.update();
+        }
+
+        // Restore Monthly Breakdown Chart
+        if (data.monthly_breakdown && monthlyChart) {
+            monthlyChart.data.labels = data.monthly_breakdown.map(m => m.month);
+            monthlyChart.data.datasets[0].data = data.monthly_breakdown.map(m => m.profit);
+            monthlyChart.data.datasets[0].backgroundColor = data.monthly_breakdown.map(m => m.profit >= 0 ? 'rgba(0, 255, 136, 0.7)' : 'rgba(255, 51, 68, 0.7)');
+            monthlyChart.update();
+        }
+
+        // Restore Sliders if params exist
+        if (p) {
+            if (p.bb_std_dev) {
+                document.getElementById('param-bb-std').value = p.bb_std_dev;
+                document.getElementById('val-bb-std').textContent = p.bb_std_dev;
+            }
+            if (p.rsi_oversold) {
+                document.getElementById('param-rsi').value = p.rsi_oversold;
+                document.getElementById('val-rsi').textContent = `${p.rsi_oversold} / ${100 - p.rsi_oversold}`;
+            }
+            if (p.adx_threshold) {
+                document.getElementById('param-adx').value = p.adx_threshold;
+                document.getElementById('val-adx').textContent = p.adx_threshold;
+            }
+            if (p.atr_factor) {
+                document.getElementById('param-atr').value = p.atr_factor;
+                document.getElementById('val-atr').textContent = `${p.atr_factor}x`;
+            }
+            if (p.timeout_minutes) {
+                document.getElementById('param-timeout').value = p.timeout_minutes;
+                document.getElementById('val-timeout').textContent = p.timeout_minutes;
+            }
+        }
+
+        // Restore Gemini AI Report
+        if (data.ai_report) {
+            updateBacktestAiUI(data.ai_report);
+        }
+
+        // Re-render history table to highlight selected row
+        fetchBacktestHistory();
+    } catch (err) {
+        alert('過去検証復元エラー: ' + err.message);
+    }
 }
 
 function exportBacktestCsv() {
@@ -749,6 +827,8 @@ function connectWebSocket() {
                 updateAiReportUI(msg.report);
             } else if (msg.type === 'ADAPTIVE_PROFILE_UPDATED') {
                 updateAdaptiveProfileUI(msg.profile);
+            } else if (msg.type === 'BACKTEST_SAVED') {
+                fetchBacktestHistory();
             }
             fetchMetrics();
             fetchSignals();

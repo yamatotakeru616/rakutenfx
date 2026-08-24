@@ -804,6 +804,20 @@ body {
     color: var(--text-muted);
 }
 
+.clickable-row {
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.clickable-row:hover {
+    background: rgba(0, 240, 255, 0.08) !important;
+}
+
+.selected-run-row {
+    background: rgba(0, 240, 255, 0.15) !important;
+    border-left: 3px solid var(--accent-cyan);
+}
+
 /* Footer */
 .hud-footer {
     display: flex;

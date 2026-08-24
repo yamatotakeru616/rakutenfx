@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"rakutenfx/internal/domain"
 	"rakutenfx/internal/infrastructure/ai"
@@ -174,25 +175,26 @@ func (h *Handler) RunBacktest(c *gin.Context) {
 	h.lastAiReport = aiReport
 	h.resultMutex.Unlock()
 
-	// Persist to SQLite in background
-	go func() {
-		paramsJSON, _ := json.Marshal(params)
-		aiReportJSON, _ := json.Marshal(aiReport)
-		runRec := &domain.BacktestRunRecord{
-			Symbol:          "USDJPY",
-			ParamsJSON:      string(paramsJSON),
-			TotalTrades:     result.TotalTrades,
-			WinRate:         result.WinRate,
-			ProfitFactor:    result.ProfitFactor,
-			TotalProfit:     result.TotalProfit,
-			MaxDrawdown:     result.MaxDrawdown,
-			MaxDrawdownPct:  result.MaxDrawdownPct,
-			SharpeRatio:     result.SharpeRatio,
-			RobustnessScore: result.RobustnessScore,
-			AiReportJSON:    string(aiReportJSON),
-		}
-		runID, err := h.repo.SaveBacktestRun(runRec)
-		if err == nil && len(result.Trades) > 0 {
+	// Persist to SQLite synchronously to guarantee immediate availability
+	paramsJSON, _ := json.Marshal(params)
+	aiReportJSON, _ := json.Marshal(aiReport)
+	runRec := &domain.BacktestRunRecord{
+		Symbol:          "USDJPY",
+		ParamsJSON:      string(paramsJSON),
+		TotalTrades:     result.TotalTrades,
+		WinRate:         result.WinRate,
+		ProfitFactor:    result.ProfitFactor,
+		TotalProfit:     result.TotalProfit,
+		MaxDrawdown:     result.MaxDrawdown,
+		MaxDrawdownPct:  result.MaxDrawdownPct,
+		SharpeRatio:     result.SharpeRatio,
+		RobustnessScore: result.RobustnessScore,
+		AiReportJSON:    string(aiReportJSON),
+	}
+	runID, err := h.repo.SaveBacktestRun(runRec)
+	if err == nil {
+		runRec.ID = runID
+		if len(result.Trades) > 0 {
 			tradeRecs := make([]domain.BacktestTradeRecord, 0, len(result.Trades))
 			for _, t := range result.Trades {
 				tradeRecs = append(tradeRecs, domain.BacktestTradeRecord{
@@ -212,9 +214,17 @@ func (h *Handler) RunBacktest(c *gin.Context) {
 			}
 			_ = h.repo.SaveBacktestTrades(runID, tradeRecs)
 		}
-	}()
+
+		// Broadcast new backtest saved event to WebSocket clients
+		h.wsHub.BroadcastJSON(gin.H{
+			"type":   "BACKTEST_SAVED",
+			"run_id": runID,
+			"record": runRec,
+		})
+	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"run_id":    runID,
 		"result":    result,
 		"ai_report": aiReport,
 	})
@@ -252,13 +262,75 @@ func (h *Handler) OptimizeBacktest(c *gin.Context) {
 
 // GetBacktestHistory retrieves past backtest execution summaries from SQLite
 func (h *Handler) GetBacktestHistory(c *gin.Context) {
-	runs, err := h.repo.GetBacktestRuns(20)
+	runs, err := h.repo.GetBacktestRuns(50)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"runs": runs,
+	})
+}
+
+// GetBacktestRunDetail retrieves full details, trades, and reconstructed equity curve for a specific run ID.
+func (h *Handler) GetBacktestRunDetail(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid run ID"})
+		return
+	}
+
+	runRec, err := h.repo.GetBacktestRunByID(id)
+	if err != nil || runRec == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Backtest run not found"})
+		return
+	}
+
+	trades, _ := h.repo.GetBacktestTradesByRunID(id)
+
+	// Reconstruct equity curve and monthly breakdown from trades
+	equity := 100000.0 // Base 100k
+	equityCurve := []backtest.EquityPoint{
+		{Time: runRec.CreatedAt.AddDate(-1, 0, 0), Equity: equity},
+	}
+	monthlyMap := make(map[string]*backtest.MonthlyProfit)
+
+	for _, t := range trades {
+		equity += t.Profit
+		equityCurve = append(equityCurve, backtest.EquityPoint{
+			Time:   t.CloseTime,
+			Equity: math.Round(equity),
+		})
+
+		mKey := t.CloseTime.Format("2006-01")
+		if _, ok := monthlyMap[mKey]; !ok {
+			monthlyMap[mKey] = &backtest.MonthlyProfit{Month: mKey}
+		}
+		monthlyMap[mKey].Profit += t.Profit
+		monthlyMap[mKey].TradesCount++
+	}
+
+	monthlyList := make([]backtest.MonthlyProfit, 0, len(monthlyMap))
+	for _, mp := range monthlyMap {
+		monthlyList = append(monthlyList, *mp)
+	}
+
+	var params backtest.StrategyParams
+	_ = json.Unmarshal([]byte(runRec.ParamsJSON), &params)
+
+	var aiReport *domain.AiEvaluationReport
+	if runRec.AiReportJSON != "" {
+		_ = json.Unmarshal([]byte(runRec.AiReportJSON), &aiReport)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"run":              runRec,
+		"params":           params,
+		"trades":           trades,
+		"equity_curve":     equityCurve,
+		"monthly_breakdown": monthlyList,
+		"ai_report":        aiReport,
 	})
 }
 

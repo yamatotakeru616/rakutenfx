@@ -60,6 +60,7 @@ func SetupRouter(h *Handler, staticFS embed.FS) *gin.Engine {
 		api.POST("/backtest/run", h.RunBacktest)
 		api.POST("/backtest/optimize", h.OptimizeBacktest)
 		api.GET("/backtest/history", h.GetBacktestHistory)
+		api.GET("/backtest/run/:id", h.GetBacktestRunDetail)
 		api.GET("/backtest/export", h.ExportBacktestCSV)
 	}
 

@@ -347,6 +347,55 @@ func (r *SQLiteRepository) GetBacktestRuns(limit int) ([]domain.BacktestRunRecor
 	return list, nil
 }
 
+// GetBacktestRunByID retrieves a single backtest run record by its ID.
+func (r *SQLiteRepository) GetBacktestRunByID(id int64) (*domain.BacktestRunRecord, error) {
+	row := r.db.QueryRow(`
+		SELECT id, symbol, params_json, total_trades, win_rate, profit_factor,
+		       total_profit, max_drawdown, max_drawdown_pct, sharpe_ratio,
+		       robustness_score, ai_report_json, created_at
+		FROM backtest_runs
+		WHERE id = ?
+	`, id)
+
+	var rec domain.BacktestRunRecord
+	if err := row.Scan(
+		&rec.ID, &rec.Symbol, &rec.ParamsJSON, &rec.TotalTrades, &rec.WinRate,
+		&rec.ProfitFactor, &rec.TotalProfit, &rec.MaxDrawdown, &rec.MaxDrawdownPct,
+		&rec.SharpeRatio, &rec.RobustnessScore, &rec.AiReportJSON, &rec.CreatedAt,
+	); err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
+// GetBacktestTradesByRunID retrieves all trade records belonging to a backtest run.
+func (r *SQLiteRepository) GetBacktestTradesByRunID(runID int64) ([]domain.BacktestTradeRecord, error) {
+	rows, err := r.db.Query(`
+		SELECT id, run_id, ticket, action, lots, open_price, close_price,
+		       open_time, close_time, profit, pips, reason, regime
+		FROM backtest_trades
+		WHERE run_id = ?
+		ORDER BY id ASC
+	`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []domain.BacktestTradeRecord
+	for rows.Next() {
+		var t domain.BacktestTradeRecord
+		if err := rows.Scan(
+			&t.ID, &t.RunID, &t.Ticket, &t.Action, &t.Lots, &t.OpenPrice, &t.ClosePrice,
+			&t.OpenTime, &t.CloseTime, &t.Profit, &t.Pips, &t.Reason, &t.Regime,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, nil
+}
+
 func (r *SQLiteRepository) Close() error {
 	return r.db.Close()
 }
