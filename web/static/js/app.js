@@ -27,10 +27,11 @@ function switchTab(tabName) {
     if (activeBtn) activeBtn.classList.add('active');
     if (activeView) activeView.classList.add('active');
 
-    // Trigger chart resize if needed
-    if (tabName === 'backtest' && backtestEquityChart) {
-        backtestEquityChart.resize();
+    // Trigger chart resize & load history if backtest tab
+    if (tabName === 'backtest') {
+        if (backtestEquityChart) backtestEquityChart.resize();
         if (monthlyChart) monthlyChart.resize();
+        fetchBacktestHistory();
     }
 }
 
@@ -359,15 +360,17 @@ function renderGridRankings(rankings) {
     tbody.innerHTML = '';
 
     if (rankings.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">有効な最適化結果が得られませんでした</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="table-placeholder-cell">有効な最適化結果が得られませんでした</td></tr>';
         return;
     }
 
     rankings.forEach(r => {
         const tr = document.createElement('tr');
         const pfHighlight = r.profit_factor >= 1.30 ? 'style="color: var(--accent-gold); font-weight: bold;"' : '';
+        const scoreVal = r.robustness_score ? r.robustness_score.toFixed(1) : '-';
         tr.innerHTML = `
             <td>#${r.rank}</td>
+            <td style="color: var(--accent-cyan); font-weight: 700;">${scoreVal}</td>
             <td ${pfHighlight}>${r.profit_factor.toFixed(2)}</td>
             <td>${r.win_rate.toFixed(1)}%</td>
             <td style="color: ${r.total_profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">¥${r.total_profit.toLocaleString()}</td>
@@ -377,6 +380,57 @@ function renderGridRankings(rankings) {
             <td>${r.params.rsi_oversold}/${r.params.rsi_overbought}</td>
             <td>${r.params.adx_threshold}</td>
             <td>${r.params.timeout_minutes}m</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Fetch and Render Past Backtest DB Runs
+async function fetchBacktestHistory() {
+    try {
+        const res = await fetch('/api/backtest/history');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderBacktestHistory(data.runs || []);
+    } catch (e) {
+        console.error('Failed to fetch backtest history:', e);
+    }
+}
+
+function renderBacktestHistory(runs) {
+    const tbody = document.getElementById('bt-history-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (runs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="table-placeholder-cell">DBに保存されたバックテスト履歴はありません</td></tr>';
+        return;
+    }
+
+    runs.forEach(r => {
+        const tr = document.createElement('tr');
+        let paramsText = '';
+        try {
+            const p = JSON.parse(r.params_json);
+            paramsText = `BB(${p.bb_std_dev}σ) RSI(${p.rsi_oversold}/${p.rsi_overbought}) ADX(${p.adx_threshold}) TO(${p.timeout_minutes}m)`;
+        } catch (e) {
+            paramsText = r.params_json;
+        }
+
+        const dateStr = r.created_at ? r.created_at.split('.')[0].replace('T', ' ') : '';
+        const pfHighlight = r.profit_factor >= 1.30 ? 'style="color: var(--accent-gold); font-weight: bold;"' : '';
+
+        tr.innerHTML = `
+            <td>#${r.id}</td>
+            <td style="font-size: 11px; color: var(--text-muted);">${dateStr}</td>
+            <td><strong>${r.symbol}</strong></td>
+            <td style="color: var(--accent-cyan); font-weight: 700;">${r.robustness_score.toFixed(1)}</td>
+            <td ${pfHighlight}>${r.profit_factor.toFixed(2)}</td>
+            <td>${r.win_rate.toFixed(1)}%</td>
+            <td style="color: ${r.total_profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">¥${r.total_profit.toLocaleString()}</td>
+            <td>¥${r.max_drawdown.toLocaleString()}</td>
+            <td>${r.total_trades}</td>
+            <td style="font-size: 10px; color: var(--text-muted);">${paramsText}</td>
         `;
         tbody.appendChild(tr);
     });

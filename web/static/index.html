@@ -421,13 +421,14 @@
                         <!-- Top Grid Search Ranking Table -->
                         <div class="grid-ranking-container">
                             <div class="panel-header">
-                                <h3>🏆 TOP HYPERPARAMETER CONFIGURATIONS (Grid Search)</h3>
+                                <h3>🏆 TOP HYPERPARAMETER CONFIGURATIONS (Grid Search &amp; Robustness Ranking)</h3>
                             </div>
                             <div class="table-wrapper scrollable-ranking-wrapper">
                                 <table class="hud-table small-table">
                                     <thead>
                                         <tr>
                                             <th scope="col">Rank</th>
+                                            <th scope="col">Score</th>
                                             <th scope="col">PF</th>
                                             <th scope="col">WinRate</th>
                                             <th scope="col">Net Profit</th>
@@ -441,8 +442,8 @@
                                     </thead>
                                     <tbody id="grid-ranking-tbody">
                                         <tr>
-                                            <td colspan="10" class="table-placeholder-cell">
-                                                「グリッド最適化」を実行すると上位ランキングが表示されます
+                                            <td colspan="11" class="table-placeholder-cell">
+                                                「グリッド最適化」を実行すると堅牢性スコア順に上位ランキングが表示されます
                                             </td>
                                         </tr>
                                     </tbody>
@@ -451,6 +452,35 @@
                         </div>
                     </div>
                 </section>
+            </section>
+
+            <!-- Bottom: Past Backtest DB Runs Ledger -->
+            <section class="trades-ledger glass-panel">
+                <div class="panel-header">
+                    <h2>📜 PAST BACKTEST RUNS (SQLite Persistent Records)</h2>
+                    <button type="button" class="small-btn" onclick="fetchBacktestHistory()">🔄 Reload DB</button>
+                </div>
+                <div class="table-wrapper">
+                    <table class="hud-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Run ID</th>
+                                <th scope="col">Tested At</th>
+                                <th scope="col">Symbol</th>
+                                <th scope="col">Robustness Score</th>
+                                <th scope="col">Profit Factor</th>
+                                <th scope="col">Win Rate</th>
+                                <th scope="col">Net Profit</th>
+                                <th scope="col">Max Drawdown</th>
+                                <th scope="col">Trades</th>
+                                <th scope="col">Parameters Config</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bt-history-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </section>
 

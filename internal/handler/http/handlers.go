@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"rakutenfx/internal/domain"
@@ -173,6 +174,46 @@ func (h *Handler) RunBacktest(c *gin.Context) {
 	h.lastAiReport = aiReport
 	h.resultMutex.Unlock()
 
+	// Persist to SQLite in background
+	go func() {
+		paramsJSON, _ := json.Marshal(params)
+		aiReportJSON, _ := json.Marshal(aiReport)
+		runRec := &domain.BacktestRunRecord{
+			Symbol:          "USDJPY",
+			ParamsJSON:      string(paramsJSON),
+			TotalTrades:     result.TotalTrades,
+			WinRate:         result.WinRate,
+			ProfitFactor:    result.ProfitFactor,
+			TotalProfit:     result.TotalProfit,
+			MaxDrawdown:     result.MaxDrawdown,
+			MaxDrawdownPct:  result.MaxDrawdownPct,
+			SharpeRatio:     result.SharpeRatio,
+			RobustnessScore: result.RobustnessScore,
+			AiReportJSON:    string(aiReportJSON),
+		}
+		runID, err := h.repo.SaveBacktestRun(runRec)
+		if err == nil && len(result.Trades) > 0 {
+			tradeRecs := make([]domain.BacktestTradeRecord, 0, len(result.Trades))
+			for _, t := range result.Trades {
+				tradeRecs = append(tradeRecs, domain.BacktestTradeRecord{
+					RunID:      runID,
+					Ticket:     t.Ticket,
+					Action:     t.Action,
+					Lots:       t.Lots,
+					OpenPrice:  t.OpenPrice,
+					ClosePrice: t.ClosePrice,
+					OpenTime:   t.OpenTime,
+					CloseTime:  t.CloseTime,
+					Profit:     t.Profit,
+					Pips:       t.Pips,
+					Reason:     t.Reason,
+					Regime:     t.Regime,
+				})
+			}
+			_ = h.repo.SaveBacktestTrades(runID, tradeRecs)
+		}
+	}()
+
 	c.JSON(http.StatusOK, gin.H{
 		"result":    result,
 		"ai_report": aiReport,
@@ -184,8 +225,40 @@ func (h *Handler) OptimizeBacktest(c *gin.Context) {
 	bars := h.getHistoricalBars()
 	ranking := h.optimizer.OptimizeGrid(bars)
 
+	// Persist top optimizations to SQLite
+	go func() {
+		optRecs := make([]domain.BacktestOptimizationRecord, 0, len(ranking))
+		for _, r := range ranking {
+			pJSON, _ := json.Marshal(r.Params)
+			optRecs = append(optRecs, domain.BacktestOptimizationRecord{
+				RunID:           0, // General optimization run
+				Rank:            r.Rank,
+				ParamsJSON:      string(pJSON),
+				ProfitFactor:    r.ProfitFactor,
+				WinRate:         r.WinRate,
+				TotalProfit:     r.TotalProfit,
+				MaxDrawdown:     r.MaxDrawdown,
+				TotalTrades:     r.TotalTrades,
+				RobustnessScore: r.RobustnessScore,
+			})
+		}
+		_ = h.repo.SaveOptimizations(0, optRecs)
+	}()
+
 	c.JSON(http.StatusOK, gin.H{
 		"rankings": ranking,
+	})
+}
+
+// GetBacktestHistory retrieves past backtest execution summaries from SQLite
+func (h *Handler) GetBacktestHistory(c *gin.Context) {
+	runs, err := h.repo.GetBacktestRuns(20)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"runs": runs,
 	})
 }
 

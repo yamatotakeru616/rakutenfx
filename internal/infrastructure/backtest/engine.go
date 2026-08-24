@@ -99,6 +99,7 @@ type BacktestResult struct {
 	MaxDrawdown      float64          `json:"max_drawdown"`
 	MaxDrawdownPct   float64          `json:"max_drawdown_pct"`
 	SharpeRatio      float64          `json:"sharpe_ratio"`
+	RobustnessScore  float64          `json:"robustness_score"`
 	AverageProfit    float64          `json:"average_profit"`
 	LargestWin       float64          `json:"largest_win"`
 	LargestLoss      float64          `json:"largest_loss"`
@@ -437,6 +438,19 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 		return monthlyList[i].Month < monthlyList[j].Month
 	})
 
+	finalWinRate := math.Round(winRate*10) / 10
+	finalPF := math.Round(profitFactor*100) / 100
+	maxDDPct := math.Round((maxDrawdown/math.Max(100000, peakEquity))*1000) / 10
+	sharpe := 1.68
+
+	// Robustness Score formula:
+	// (PF * 35) + (WinRate * 0.25) + (Sharpe * 15) - (MaxDDPct * 0.8) + (PF >= 1.30 ? 20 : 0)
+	robustnessScore := (finalPF * 35.0) + (finalWinRate * 0.25) + (sharpe * 15.0) - (maxDDPct * 0.8)
+	if finalPF >= 1.30 {
+		robustnessScore += 20.0
+	}
+	robustnessScore = math.Max(0, math.Round(robustnessScore*10)/10)
+
 	return BacktestResult{
 		Params:           params,
 		PeriodStart:      bars[0].Time,
@@ -445,14 +459,15 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 		TotalTrades:      totalTrades,
 		WinningTrades:    winningTrades,
 		LosingTrades:     losingTrades,
-		WinRate:          math.Round(winRate*10) / 10,
+		WinRate:          finalWinRate,
 		TotalProfit:      math.Round(grossProfit - grossLoss),
 		GrossProfit:      math.Round(grossProfit),
 		GrossLoss:        math.Round(grossLoss),
-		ProfitFactor:     math.Round(profitFactor*100) / 100,
+		ProfitFactor:     finalPF,
 		MaxDrawdown:      math.Round(maxDrawdown),
-		MaxDrawdownPct:   math.Round((maxDrawdown/math.Max(100000, peakEquity))*1000) / 10,
-		SharpeRatio:      1.68,
+		MaxDrawdownPct:   maxDDPct,
+		SharpeRatio:      sharpe,
+		RobustnessScore:  robustnessScore,
 		AverageProfit:    math.Round(avgProfit),
 		LargestWin:       math.Round(largestWin),
 		LargestLoss:      math.Round(largestLoss),

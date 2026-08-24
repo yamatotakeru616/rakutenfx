@@ -89,6 +89,56 @@ func (r *SQLiteRepository) initTables() error {
 		raw_report TEXT NOT NULL,
 		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 	);
+
+	CREATE TABLE IF NOT EXISTS backtest_runs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		symbol TEXT NOT NULL,
+		params_json TEXT NOT NULL,
+		total_trades INTEGER NOT NULL,
+		win_rate REAL NOT NULL,
+		profit_factor REAL NOT NULL,
+		total_profit REAL NOT NULL,
+		max_drawdown REAL NOT NULL,
+		max_drawdown_pct REAL NOT NULL,
+		sharpe_ratio REAL NOT NULL,
+		robustness_score REAL NOT NULL,
+		ai_report_json TEXT NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_bt_runs_created ON backtest_runs (created_at);
+
+	CREATE TABLE IF NOT EXISTS backtest_trades (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		run_id INTEGER NOT NULL,
+		ticket INTEGER NOT NULL,
+		action TEXT NOT NULL,
+		lots REAL NOT NULL,
+		open_price REAL NOT NULL,
+		close_price REAL NOT NULL,
+		open_time DATETIME NOT NULL,
+		close_time DATETIME NOT NULL,
+		profit REAL NOT NULL,
+		pips REAL NOT NULL,
+		reason TEXT NOT NULL,
+		regime TEXT NOT NULL,
+		FOREIGN KEY(run_id) REFERENCES backtest_runs(id) ON DELETE CASCADE
+	);
+	CREATE INDEX IF NOT EXISTS idx_bt_trades_run ON backtest_trades (run_id);
+
+	CREATE TABLE IF NOT EXISTS backtest_optimizations (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		run_id INTEGER NOT NULL,
+		rank INTEGER NOT NULL,
+		params_json TEXT NOT NULL,
+		profit_factor REAL NOT NULL,
+		win_rate REAL NOT NULL,
+		total_profit REAL NOT NULL,
+		max_drawdown REAL NOT NULL,
+		total_trades INTEGER NOT NULL,
+		robustness_score REAL NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_bt_opts_run ON backtest_optimizations (run_id);
 	`
 	_, err := r.db.Exec(schema)
 	return err
@@ -185,6 +235,116 @@ func (r *SQLiteRepository) SaveAiReport(report *domain.AiEvaluationReport) error
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`, report.Title, report.OverallRank, report.Summary, "[]", "[]", "[]", report.RawReport, time.Now())
 	return err
+}
+
+// SaveBacktestRun saves a backtest execution summary and returns the inserted run ID.
+func (r *SQLiteRepository) SaveBacktestRun(rec *domain.BacktestRunRecord) (int64, error) {
+	res, err := r.db.Exec(`
+		INSERT INTO backtest_runs (
+			symbol, params_json, total_trades, win_rate, profit_factor,
+			total_profit, max_drawdown, max_drawdown_pct, sharpe_ratio,
+			robustness_score, ai_report_json, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, rec.Symbol, rec.ParamsJSON, rec.TotalTrades, rec.WinRate, rec.ProfitFactor,
+		rec.TotalProfit, rec.MaxDrawdown, rec.MaxDrawdownPct, rec.SharpeRatio,
+		rec.RobustnessScore, rec.AiReportJSON, time.Now())
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// SaveBacktestTrades saves all simulated trade records for a run.
+func (r *SQLiteRepository) SaveBacktestTrades(runID int64, trades []domain.BacktestTradeRecord) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO backtest_trades (
+			run_id, ticket, action, lots, open_price, close_price,
+			open_time, close_time, profit, pips, reason, regime
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, t := range trades {
+		_, err := stmt.Exec(
+			runID, t.Ticket, t.Action, t.Lots, t.OpenPrice, t.ClosePrice,
+			t.OpenTime, t.CloseTime, t.Profit, t.Pips, t.Reason, t.Regime,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SaveOptimizations saves grid search top rankings for a run.
+func (r *SQLiteRepository) SaveOptimizations(runID int64, opts []domain.BacktestOptimizationRecord) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO backtest_optimizations (
+			run_id, rank, params_json, profit_factor, win_rate,
+			total_profit, max_drawdown, total_trades, robustness_score, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for _, o := range opts {
+		_, err := stmt.Exec(
+			runID, o.Rank, o.ParamsJSON, o.ProfitFactor, o.WinRate,
+			o.TotalProfit, o.MaxDrawdown, o.TotalTrades, o.RobustnessScore, now,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GetBacktestRuns retrieves past backtest execution summaries.
+func (r *SQLiteRepository) GetBacktestRuns(limit int) ([]domain.BacktestRunRecord, error) {
+	rows, err := r.db.Query(`
+		SELECT id, symbol, params_json, total_trades, win_rate, profit_factor,
+		       total_profit, max_drawdown, max_drawdown_pct, sharpe_ratio,
+		       robustness_score, ai_report_json, created_at
+		FROM backtest_runs
+		ORDER BY id DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []domain.BacktestRunRecord
+	for rows.Next() {
+		var rec domain.BacktestRunRecord
+		if err := rows.Scan(
+			&rec.ID, &rec.Symbol, &rec.ParamsJSON, &rec.TotalTrades, &rec.WinRate,
+			&rec.ProfitFactor, &rec.TotalProfit, &rec.MaxDrawdown, &rec.MaxDrawdownPct,
+			&rec.SharpeRatio, &rec.RobustnessScore, &rec.AiReportJSON, &rec.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, rec)
+	}
+	return list, nil
 }
 
 func (r *SQLiteRepository) Close() error {

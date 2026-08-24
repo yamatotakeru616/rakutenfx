@@ -9,13 +9,14 @@ import (
 
 // GridSearchResult holds single parameter configuration and resulting score
 type GridSearchResult struct {
-	Params       StrategyParams `json:"params"`
-	ProfitFactor float64        `json:"profit_factor"`
-	WinRate      float64        `json:"win_rate"`
-	TotalProfit  float64        `json:"total_profit"`
-	MaxDrawdown  float64        `json:"max_drawdown"`
-	TotalTrades  int            `json:"total_trades"`
-	Rank         int            `json:"rank"`
+	Params          StrategyParams `json:"params"`
+	ProfitFactor    float64        `json:"profit_factor"`
+	WinRate         float64        `json:"win_rate"`
+	TotalProfit     float64        `json:"total_profit"`
+	MaxDrawdown     float64        `json:"max_drawdown"`
+	TotalTrades     int            `json:"total_trades"`
+	RobustnessScore float64        `json:"robustness_score"`
+	Rank            int            `json:"rank"`
 }
 
 // Optimizer executes parallel grid search for optimal parameters
@@ -77,12 +78,13 @@ func (o *Optimizer) OptimizeGrid(bars []Bar) []GridSearchResult {
 			for param := range taskChan {
 				res := o.engine.Run(bars, param)
 				resultChan <- GridSearchResult{
-					Params:       param,
-					ProfitFactor: res.ProfitFactor,
-					WinRate:      res.WinRate,
-					TotalProfit:  res.TotalProfit,
-					MaxDrawdown:  res.MaxDrawdown,
-					TotalTrades:  res.TotalTrades,
+					Params:          param,
+					ProfitFactor:    res.ProfitFactor,
+					WinRate:         res.WinRate,
+					TotalProfit:     res.TotalProfit,
+					MaxDrawdown:     res.MaxDrawdown,
+					TotalTrades:     res.TotalTrades,
+					RobustnessScore: res.RobustnessScore,
 				}
 			}
 		}()
@@ -98,8 +100,11 @@ func (o *Optimizer) OptimizeGrid(bars []Bar) []GridSearchResult {
 		}
 	}
 
-	// Sort by Profit Factor descending, then TotalProfit descending
+	// Sort by RobustnessScore descending, then ProfitFactor descending
 	sort.Slice(results, func(i, j int) bool {
+		if results[i].RobustnessScore != results[j].RobustnessScore {
+			return results[i].RobustnessScore > results[j].RobustnessScore
+		}
 		if results[i].ProfitFactor != results[j].ProfitFactor {
 			return results[i].ProfitFactor > results[j].ProfitFactor
 		}

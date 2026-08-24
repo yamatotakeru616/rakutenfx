@@ -151,3 +151,52 @@ type AdaptiveProfile struct {
 	ActionRationale    string    `json:"action_rationale"`    // AI explanation of adaptation
 	AdaptedAt          time.Time `json:"adapted_at"`
 }
+
+// BacktestRunRecord represents a saved backtest execution summary in SQLite.
+type BacktestRunRecord struct {
+	ID              int64     `json:"id" db:"id"`
+	Symbol          string    `json:"symbol" db:"symbol"`
+	ParamsJSON      string    `json:"params_json" db:"params_json"`
+	TotalTrades     int       `json:"total_trades" db:"total_trades"`
+	WinRate         float64   `json:"win_rate" db:"win_rate"`
+	ProfitFactor    float64   `json:"profit_factor" db:"profit_factor"`
+	TotalProfit     float64   `json:"total_profit" db:"total_profit"`
+	MaxDrawdown     float64   `json:"max_drawdown" db:"max_drawdown"`
+	MaxDrawdownPct  float64   `json:"max_drawdown_pct" db:"max_drawdown_pct"`
+	SharpeRatio     float64   `json:"sharpe_ratio" db:"sharpe_ratio"`
+	RobustnessScore float64   `json:"robustness_score" db:"robustness_score"`
+	AiReportJSON    string    `json:"ai_report_json" db:"ai_report_json"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+// BacktestTradeRecord represents an individual trade in a backtest run.
+type BacktestTradeRecord struct {
+	ID         int64     `json:"id" db:"id"`
+	RunID      int64     `json:"run_id" db:"run_id"`
+	Ticket     int       `json:"ticket" db:"ticket"`
+	Action     string    `json:"action" db:"action"`
+	Lots       float64   `json:"lots" db:"lots"`
+	OpenPrice  float64   `json:"open_price" db:"open_price"`
+	ClosePrice float64   `json:"close_price" db:"close_price"`
+	OpenTime   time.Time `json:"open_time" db:"open_time"`
+	CloseTime  time.Time `json:"close_time" db:"close_time"`
+	Profit     float64   `json:"profit" db:"profit"`
+	Pips       float64   `json:"pips" db:"pips"`
+	Reason     string    `json:"reason" db:"reason"`
+	Regime     string    `json:"regime" db:"regime"`
+}
+
+// BacktestOptimizationRecord represents a top hyperparameter result from grid search.
+type BacktestOptimizationRecord struct {
+	ID              int64     `json:"id" db:"id"`
+	RunID           int64     `json:"run_id" db:"run_id"`
+	Rank            int       `json:"rank" db:"rank"`
+	ParamsJSON      string    `json:"params_json" db:"params_json"`
+	ProfitFactor    float64   `json:"profit_factor" db:"profit_factor"`
+	WinRate         float64   `json:"win_rate" db:"win_rate"`
+	TotalProfit     float64   `json:"total_profit" db:"total_profit"`
+	MaxDrawdown     float64   `json:"max_drawdown" db:"max_drawdown"`
+	TotalTrades     int       `json:"total_trades" db:"total_trades"`
+	RobustnessScore float64   `json:"robustness_score" db:"robustness_score"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
