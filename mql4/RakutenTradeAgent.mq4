@@ -37,6 +37,16 @@ input string StrategyHeader = "=== MULTI-FILTER MEAN REVERSION ===";
 input int    PyramiddingMax = 2;        // ピラミッティング上限 (最大ポジション数)
 input int    TimeoutMinutes = 120;      // タイムベース強制決済 (分, 0で無効)
 
+// --- 資金管理・プロクオンツリスク設定 (10万円スタート・許容損失2%・RR 1:2.0) ---
+input string MoneyMgmtHeader    = "=== MONEY MANAGEMENT (2% RISK, RR 1:2.0) ===";
+input double RiskPercent        = 2.0;  // 1トレードあたりの許容リスク (% of Balance)
+input double RiskRewardRatio    = 2.0;  // リスクリワード比率 (TP / SL, デフォルト: 2.0)
+input bool   UseDynamicLot      = true; // 許容損失2%に基づく自動ロット逆算
+input double MinLot             = 0.01; // 最小発注ロット
+input double MaxLot             = 5.00; // 最大発注ロット
+input double FixedDefaultSLPips = 10.0; // 基準損切り幅 (pips)
+input bool   RequireBELockForPyramid = true; // 2ポジ目追加時に1ポジ目の建値固定(BE Lock)を必須化
+
 // --- 取引時間帯制御 (日本時間 JST 16:00 - 24:00 設定) ---
 input string TimeFilterHeader = "=== JST TRADING HOUR FILTER ===";
 input bool   EnableHourFilter   = true; // 時間帯フィルターを有効化
@@ -207,10 +217,13 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
    CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 450, 115, C'10,15,28', (in_golden_zone ? clrGold : C'34,47,76'));
 
    // 2. HUD テキストの描画
+   double cur_balance = AccountBalance();
+   if(cur_balance <= 0) cur_balance = 100000.0;
+   double cur_risk_jpy = cur_balance * (RiskPercent / 100.0);
    CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [MULTI-FILTER MEAN REV] <<<", 10, "Arial Bold", clrDeepSkyBlue);
    CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[4-STATE REGIME] %s", display_regime), 9, "Arial Bold", regime_clr);
    CreateOrUpdateLabel("RTA_HUD_KS", 18, 50, StringFormat("[AI KILL-SWITCH] %s | JST %d:00-%d:00", killswitch_str, StartJSTHour, EndJSTHour), 9, "Arial Bold", clrGold);
-   CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, "[STRATEGY] BB(20,2.0) + RSI(14) + MTF-ATR + ADX | MaxPos: 2", 9, "Arial Bold", clrLightCyan);
+   CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, StringFormat("[RISK MGMT] Bal: ¥%.0f | Risk: %.1f%% (¥%.0f) | RR 1:%.1f", cur_balance, RiskPercent, cur_risk_jpy, RiskRewardRatio), 9, "Arial Bold", clrLightCyan);
 
    // 3. リアルタイム獲得pips・含み損益メーターの計算＆表示
    double pip_size = (Digits == 3 || Digits == 5) ? Point * 10 : Point;
@@ -937,11 +950,47 @@ void ExecuteOrder(int order_type, double lot, double sl_pips, double tp_pips)
       Sleep(200);
    }
 
-   // 2. ピラミッティング上限チェック (最大 PyramiddingMax)
+   // 2. ピラミッティングチェック (建値固定 BE Lock 完了済みかを検証)
    if(same_dir_count >= PyramiddingMax)
    {
       PrintFormat("[RakutenTradeAgent] ℹ️ Pyramidding limit reached (%d >= %d). Skipping additional entry.", same_dir_count, PyramiddingMax);
       return;
+   }
+   if(same_dir_count > 0 && RequireBELockForPyramid)
+   {
+      bool be_locked = false;
+      for(int p = OrdersTotal() - 1; p >= 0; p--)
+      {
+         if(OrderSelect(p, SELECT_BY_POS, MODE_TRADES))
+         {
+            if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol() && OrderType() == order_type)
+            {
+               if(order_type == OP_BUY && OrderStopLoss() >= OrderOpenPrice()) be_locked = true;
+               if(order_type == OP_SELL && OrderStopLoss() > 0 && OrderStopLoss() <= OrderOpenPrice()) be_locked = true;
+            }
+         }
+      }
+      if(!be_locked)
+      {
+         PrintFormat("[RakutenTradeAgent] ⚠️ Pyramidding skipped: Position 1 is not yet BE Locked (Risk not zero).");
+         return;
+      }
+   }
+
+   // 3. 損切り幅 (sl_pips) & リスクリワード 1:2.0 利確目標 (tp_pips) の決定
+   if(sl_pips <= 0) sl_pips = FixedDefaultSLPips;
+   tp_pips = sl_pips * RiskRewardRatio; // 常に 1:2.0
+
+   // 4. 動的ロットサイズ逆算 (口座残高の2%損失に固定)
+   if(UseDynamicLot)
+   {
+      double balance = AccountBalance();
+      if(balance <= 0) balance = 100000.0;
+      double allowed_risk_jpy = balance * (RiskPercent / 100.0); // 例: 100,000 * 0.02 = 2,000 JPY
+      double calculated_lot = allowed_risk_jpy / (sl_pips * 1000.0); // 1Lot=100,000通貨 = 1pip 1,000円
+      lot = MathMax(MinLot, MathMin(MaxLot, calculated_lot));
+      // 0.01刻みに丸め
+      lot = MathFloor(lot * 100.0) / 100.0;
    }
 
    double price = (order_type == OP_BUY) ? Ask : Bid;
@@ -965,16 +1014,14 @@ void ExecuteOrder(int order_type, double lot, double sl_pips, double tp_pips)
       tp = price - (tp_pips * pip_size);
    }
 
-   lot = MathMax(MarketInfo(Symbol(), MODE_MINLOT), MathMin(MarketInfo(Symbol(), MODE_MAXLOT), lot));
-
    color clr = (order_type == OP_BUY) ? clrBlue : clrRed;
    string order_tag = (same_dir_count > 0) ? "MeanRev_Pyramid" : "MeanRev_Auto";
    int ticket = OrderSend(Symbol(), order_type, lot, price, Slippage, sl, tp, order_tag, MagicNumber, 0, clr);
 
    if(ticket > 0)
    {
-      PrintFormat("[RakutenTradeAgent] 🎯 Order executed: Ticket #%d, %s, Lot: %.2f, Price: %.5f, SL: %.5f (%.1f pips), TP: %.5f (%.1f pips), Pyramidding: %d/%d",
-         ticket, (order_type == OP_BUY ? "BUY" : "SELL"), lot, price, sl, sl_pips, tp, tp_pips, same_dir_count + 1, PyramiddingMax
+      PrintFormat("[RakutenTradeAgent] 🎯 Order executed: Ticket #%d, %s, Lot: %.2f (Risk 2%%: ¥%.0f), Price: %.5f, SL: %.5f (%.1f pips), TP: %.5f (%.1f pips, RR 1:%.1f), Pyramidding: %d/%d",
+         ticket, (order_type == OP_BUY ? "BUY" : "SELL"), lot, (AccountBalance() * (RiskPercent / 100.0)), price, sl, sl_pips, tp, tp_pips, RiskRewardRatio, same_dir_count + 1, PyramiddingMax
       );
       
       DrawEntryMarker(order_type, price, sl, tp, lot, ticket);

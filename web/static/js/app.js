@@ -226,6 +226,10 @@ async function runOneYearBacktest() {
     btn.disabled = true;
     btn.textContent = '⏳ RUNNING BACKTEST (370,000 TICKS)...';
 
+    const slPips = parseFloat(document.getElementById('param-sl-pips').value);
+    const rrRatio = parseFloat(document.getElementById('param-rr-ratio').value);
+    const riskPct = parseFloat(document.getElementById('param-risk-pct').value);
+
     const params = {
         bb_period: 20,
         bb_std_dev: parseFloat(document.getElementById('param-bb-std').value),
@@ -238,13 +242,17 @@ async function runOneYearBacktest() {
         atr_factor: parseFloat(document.getElementById('param-atr').value),
         pyramidding_max: 2,
         timeout_minutes: parseInt(document.getElementById('param-timeout').value),
-        lot_size: 0.25,
-        stop_loss_pips: 15.0,
-        take_profit_pips: 30.0,
+        lot_size: 0.20,
+        stop_loss_pips: slPips,
+        take_profit_pips: slPips * rrRatio,
         spread_pips: 0.2,
         enable_hour_filter: true,
         start_jst_hour: currentJstStart,
-        end_jst_hour: currentJstEnd
+        end_jst_hour: currentJstEnd,
+        initial_balance: 100000.0,
+        risk_percent: riskPct,
+        risk_reward_ratio: rrRatio,
+        use_dynamic_risk_lot: true
     };
 
     try {

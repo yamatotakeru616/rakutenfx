@@ -20,34 +20,42 @@ type StrategyParams struct {
 	PyramiddingMax int     `json:"pyramidding_max"`  // e.g. 2
 	TimeoutMinutes int     `json:"timeout_minutes"`  // e.g. 120
 	LotSize        float64 `json:"lot_size"`         // e.g. 0.25 (25,000 currency units)
-	StopLossPips   float64 `json:"stop_loss_pips"`   // e.g. 15.0
-	TakeProfitPips float64 `json:"take_profit_pips"` // e.g. 30.0
-	SpreadPips     float64 `json:"spread_pips"`      // e.g. 0.2
-	EnableHourFilter bool  `json:"enable_hour_filter"`// e.g. true
-	StartJSTHour   int     `json:"start_jst_hour"`   // e.g. 16
-	EndJSTHour     int     `json:"end_jst_hour"`     // e.g. 24
+	StopLossPips       float64 `json:"stop_loss_pips"`       // e.g. 10.0
+	TakeProfitPips     float64 `json:"take_profit_pips"`     // e.g. 20.0 (RR 1:2.0)
+	SpreadPips         float64 `json:"spread_pips"`          // e.g. 0.2
+	EnableHourFilter   bool    `json:"enable_hour_filter"`   // e.g. true
+	StartJSTHour       int     `json:"start_jst_hour"`       // e.g. 16
+	EndJSTHour         int     `json:"end_jst_hour"`         // e.g. 24
+	InitialBalance     float64 `json:"initial_balance"`      // e.g. 100000.0 (10万円)
+	RiskPercent        float64 `json:"risk_percent"`         // e.g. 2.0%
+	RiskRewardRatio    float64 `json:"risk_reward_ratio"`    // e.g. 2.0
+	UseDynamicRiskLot  bool    `json:"use_dynamic_risk_lot"` // e.g. true
 }
 
 func DefaultStrategyParams() StrategyParams {
 	return StrategyParams{
-		BBPeriod:         20,
-		BBStdDev:         2.0,
-		RSIPeriod:        14,
-		RSIOversold:      30.0,
-		RSIOverbought:    70.0,
-		ADXPeriod:        14,
-		ADXThreshold:     25.0,
-		ATRLookback:      50,
-		ATRFactor:        1.5,
-		PyramiddingMax:   2,
-		TimeoutMinutes:   120,
-		LotSize:          0.25,
-		StopLossPips:     15.0,
-		TakeProfitPips:   30.0,
-		SpreadPips:       0.2,
-		EnableHourFilter: true,
-		StartJSTHour:     16,
-		EndJSTHour:       24,
+		BBPeriod:          20,
+		BBStdDev:          2.0,
+		RSIPeriod:         14,
+		RSIOversold:       30.0,
+		RSIOverbought:     70.0,
+		ADXPeriod:         14,
+		ADXThreshold:      25.0,
+		ATRLookback:       50,
+		ATRFactor:         1.5,
+		PyramiddingMax:    2,
+		TimeoutMinutes:    120,
+		LotSize:           0.20,
+		StopLossPips:      10.0,
+		TakeProfitPips:    20.0,
+		SpreadPips:        0.2,
+		EnableHourFilter:  true,
+		StartJSTHour:      16,
+		EndJSTHour:        24,
+		InitialBalance:    100000.0,
+		RiskPercent:       2.0,
+		RiskRewardRatio:   2.0,
+		UseDynamicRiskLot: true,
 	}
 }
 
@@ -168,9 +176,10 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			}
 
 			if !closed {
+				tpPips := params.StopLossPips * params.RiskRewardRatio
 				if pos.Action == "BUY" {
 					slPrice := pos.OpenPrice - (params.StopLossPips * pipSize)
-					tpPrice := pos.OpenPrice + (params.TakeProfitPips * pipSize)
+					tpPrice := pos.OpenPrice + (tpPips * pipSize)
 					if currentBar.Low <= slPrice {
 						closed = true
 						closePrice = slPrice
@@ -182,7 +191,7 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 					}
 				} else {
 					slPrice := pos.OpenPrice + (params.StopLossPips * pipSize)
-					tpPrice := pos.OpenPrice - (params.TakeProfitPips * pipSize)
+					tpPrice := pos.OpenPrice - (tpPips * pipSize)
 					if currentBar.High >= slPrice {
 						closed = true
 						closePrice = slPrice
@@ -327,12 +336,41 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 				sameCount = 0
 			}
 
-			// Pyramidding limit check (Max 2)
-			if sameCount < params.PyramiddingMax {
+			// Pyramidding limit & BE Lock check (Max 2)
+			canPyramid := true
+			if sameCount > 0 {
+				// Require first position to have +5.0 pips profit (BE Lock condition)
+				for _, pos := range activePositions {
+					var currentPnlPips float64
+					if pos.Action == "BUY" {
+						currentPnlPips = (currentBar.Close - pos.OpenPrice) / pipSize
+					} else {
+						currentPnlPips = (pos.OpenPrice - currentBar.Close) / pipSize
+					}
+					if currentPnlPips < 5.0 {
+						canPyramid = false
+						break
+					}
+				}
+			}
+
+			if sameCount < params.PyramiddingMax && canPyramid {
+				// Dynamic 2% Risk Lot Sizing (Compounding)
+				lot := params.LotSize
+				if params.UseDynamicRiskLot {
+					currentCapital := params.InitialBalance + runningEquity
+					if currentCapital < 10000.0 {
+						currentCapital = 10000.0
+					}
+					allowedRiskJPY := currentCapital * (params.RiskPercent / 100.0)
+					calcLot := allowedRiskJPY / (params.StopLossPips * 1000.0)
+					lot = math.Max(0.01, math.Min(5.00, math.Floor(calcLot*100)/100))
+				}
+
 				activePositions = append(activePositions, &SimulatedTrade{
 					Ticket:    ticketCounter,
 					Action:    action,
-					Lots:      params.LotSize,
+					Lots:      lot,
 					OpenPrice: openPrice,
 					OpenTime:  currentBar.Time,
 					Regime:    regime,
