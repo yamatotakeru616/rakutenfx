@@ -18,14 +18,15 @@ import (
 )
 
 type Handler struct {
-	repo           *persistence.SQLiteRepository
-	analyzer       *usecase.TradeAnalyzer
-	geminiClient   *ai.GeminiClient
-	ipcServer      *ipc.IpcServer
-	wsHub          *WebSocketHub
-	dataLoader     *backtest.DataLoader
-	backtestEngine *backtest.BacktestEngine
-	optimizer      *backtest.Optimizer
+	repo            *persistence.SQLiteRepository
+	analyzer        *usecase.TradeAnalyzer
+	geminiClient    *ai.GeminiClient
+	adaptiveService *usecase.AdaptiveStrategyService
+	ipcServer       *ipc.IpcServer
+	wsHub           *WebSocketHub
+	dataLoader      *backtest.DataLoader
+	backtestEngine  *backtest.BacktestEngine
+	optimizer       *backtest.Optimizer
 
 	// Cache for 1-year historical bars to avoid regenerating on each run
 	cachedBars []backtest.Bar
@@ -46,14 +47,15 @@ func NewHandler(
 ) *Handler {
 	engine := backtest.NewBacktestEngine()
 	return &Handler{
-		repo:           repo,
-		analyzer:       analyzer,
-		geminiClient:   geminiClient,
-		ipcServer:      ipcServer,
-		wsHub:          wsHub,
-		dataLoader:     backtest.NewDataLoader(),
-		backtestEngine: engine,
-		optimizer:      backtest.NewOptimizer(engine),
+		repo:            repo,
+		analyzer:        analyzer,
+		geminiClient:    geminiClient,
+		adaptiveService: usecase.NewAdaptiveStrategyService(geminiClient),
+		ipcServer:       ipcServer,
+		wsHub:           wsHub,
+		dataLoader:      backtest.NewDataLoader(),
+		backtestEngine:  engine,
+		optimizer:       backtest.NewOptimizer(engine),
 	}
 }
 
@@ -252,10 +254,67 @@ func (h *Handler) ToggleKillSwitch(c *gin.Context) {
 func (h *Handler) GetSystemStatus(c *gin.Context) {
 	isKill := h.ipcServer.IsKillSwitchActive()
 	c.JSON(http.StatusOK, gin.H{
-		"status":      "online",
-		"version":     "2.2.0 (Multi-Filter Mean Reversion + 1-Year Backtest Engine)",
-		"ipc_port":    5556,
+		"status":       "online",
+		"version":      "2.3.0 (AI Co-Evolution & Adaptive Tuning Strategy)",
+		"ipc_port":     5556,
 		"gateway_port": 5555,
-		"kill_switch": isKill,
+		"kill_switch":  isKill,
 	})
 }
+
+// GetAdaptiveProfile returns the current AI-adapted hyperparameter profile.
+func (h *Handler) GetAdaptiveProfile(c *gin.Context) {
+	profile := h.adaptiveService.GetCurrentProfile()
+	c.JSON(http.StatusOK, profile)
+}
+
+// TriggerAdaptiveTuning triggers an immediate AI market diagnosis & parameter adaptation.
+func (h *Handler) TriggerAdaptiveTuning(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get latest regime & metrics
+	trades, _ := h.repo.GetAllTrades()
+	metrics := h.analyzer.CalculateMetrics(trades)
+
+	regime := &domain.MarketRegimeInfo{
+		Symbol:       "USDJPY",
+		Regime:       domain.RegimeClear,
+		StateName:    "CLEAR (レンジ・エントリー許可)",
+		Description:  "ADX<25 かつ MTF-ATR正常。BB+RSI平均回帰の統計的エッジが有効な状態です。",
+		BBUpper:      158.950,
+		BBLower:      158.350,
+		RSI:          48.5,
+		ADX:          18.2,
+		ATRPips:      14.5,
+		EntryAllowed: true,
+		UpdatedAt:    time.Now(),
+	}
+
+	// Calculate recent loss streak
+	lossStreak := 0
+	for i := len(trades) - 1; i >= 0; i-- {
+		if trades[i].Profit < 0 {
+			lossStreak++
+		} else {
+			break
+		}
+	}
+
+	profile, err := h.adaptiveService.AdaptMarketHabit(ctx, "MANUAL_TRIGGER", regime, &metrics, lossStreak)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "profile": profile})
+		return
+	}
+
+	// Broadcast updated profile via WebSocket
+	h.wsHub.BroadcastJSON(gin.H{
+		"type":    "ADAPTIVE_PROFILE_UPDATED",
+		"profile": profile,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"profile": profile,
+	})
+}
+

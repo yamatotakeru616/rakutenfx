@@ -141,13 +141,40 @@
                     </div>
                 </section>
 
-                <!-- Right: Gemini AI Chief Analyst & 4-State Regime Reflection -->
+                <!-- Right: Gemini AI Chief Analyst & AI Co-Evolution Karte -->
                 <section class="ai-analyst-section glass-panel">
                     <div class="panel-header">
-                        <h2>🤖 GEMINI AI QUANT CHIEF ANALYST</h2>
-                        <button class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
-                            ✨ RUN AI DIAGNOSIS
-                        </button>
+                        <h2>🤖 GEMINI AI CO-EVOLUTION & QUANT ANALYST</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="ai-eval-btn" id="ai-adapt-btn" onclick="triggerAiAdaptation()" style="background: linear-gradient(135deg, #00ff88, #0088ff); color: #060913;">
+                                ⚡ 即時AI適応を実行
+                            </button>
+                            <button class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
+                                ✨ RUN AI DIAGNOSIS
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Co-Evolution Market Habit Karte -->
+                    <div class="ai-karte-panel" id="ai-karte-panel" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--accent-cyan);">🧠 AI相場適応カルテ (陳腐化防止・共創エンジン)</span>
+                            <span id="karte-edge-health" style="font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(0,255,136,0.15); color: var(--accent-green); font-weight: 700;">エッジ健全度: 92/100</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; font-family: var(--font-mono); margin-bottom: 10px;">
+                            <div>
+                                <span style="color: var(--text-muted);">検出された市場の癖:</span>
+                                <strong id="karte-market-habit" style="color: var(--accent-gold); display: block;">レンジ平均回帰型 (Mean Reverting)</strong>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-muted);">動的適応パラメータ:</span>
+                                <strong id="karte-params" style="color: var(--text-highlight); display: block;">BB: 2.0σ | RSI: 30/70 | ADX: 25 | 0.20L</strong>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-main); background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border-left: 3px solid var(--accent-cyan);">
+                            <span style="color: var(--text-muted);">AIクオンツ適応根拠: </span>
+                            <span id="karte-rationale">直近相場データを精査中。市場の構造変化と手法の整合性をリアルタイムで最適化しています。</span>
+                        </div>
                     </div>
 
                     <div class="ai-report-body" id="ai-report-body">

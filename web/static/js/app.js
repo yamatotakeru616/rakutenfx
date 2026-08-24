@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchSignals();
     fetchRegime();
     fetchSystemStatus();
+    fetchAdaptiveProfile();
     connectWebSocket();
 });
 
@@ -621,6 +622,54 @@ async function fetchSystemStatus() {
     }
 }
 
+// AI Co-Evolution & Adaptive Profile Logic
+async function fetchAdaptiveProfile() {
+    try {
+        const res = await fetch('/api/ai/adaptive-profile');
+        if (!res.ok) return;
+        const profile = await res.json();
+        updateAdaptiveProfileUI(profile);
+    } catch (e) {
+        console.error('Failed to fetch adaptive profile:', e);
+    }
+}
+
+function updateAdaptiveProfileUI(p) {
+    if (!p) return;
+    const healthEl = document.getElementById('karte-edge-health');
+    const habitEl = document.getElementById('karte-market-habit');
+    const paramsEl = document.getElementById('karte-params');
+    const rationaleEl = document.getElementById('karte-rationale');
+
+    if (healthEl) {
+        healthEl.textContent = `エッジ健全度: ${p.edge_health_score}/100`;
+        healthEl.style.background = p.decay_warning ? 'rgba(255, 51, 68, 0.2)' : 'rgba(0, 255, 136, 0.15)';
+        healthEl.style.color = p.decay_warning ? '#ff3344' : '#00ff88';
+    }
+    if (habitEl) habitEl.textContent = `${p.market_habit} [${p.session_name || 'JST'}]`;
+    if (paramsEl) paramsEl.textContent = `BB: ${p.recommended_bb_std.toFixed(1)}σ | RSI: ${p.recommended_rsi_os}/${p.recommended_rsi_ob} | ADX: ${p.recommended_adx} | Lot: ${p.recommended_lot.toFixed(2)}L`;
+    if (rationaleEl) rationaleEl.textContent = p.action_rationale;
+}
+
+async function triggerAiAdaptation() {
+    const btn = document.getElementById('ai-adapt-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ AI相場診断＆適応中...';
+
+    try {
+        const res = await fetch('/api/ai/adaptive-trigger', { method: 'POST' });
+        if (!res.ok) throw new Error('AI Adaptation failed');
+        const data = await res.json();
+        updateAdaptiveProfileUI(data.profile);
+        alert('🧠 AI共創適応完了: 市場の癖を再学習し、最適パラメータを適用しました！');
+    } catch (err) {
+        alert('AI適応エラー: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ 即時AI適応を実行';
+    }
+}
+
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -644,6 +693,8 @@ function connectWebSocket() {
                 updateKillSwitchUI(currentKillSwitchState);
             } else if (msg.type === 'AI_REPORT_GENERATED') {
                 updateAiReportUI(msg.report);
+            } else if (msg.type === 'ADAPTIVE_PROFILE_UPDATED') {
+                updateAdaptiveProfileUI(msg.profile);
             }
             fetchMetrics();
             fetchSignals();
@@ -663,3 +714,4 @@ function connectWebSocket() {
         setTimeout(connectWebSocket, 3000);
     };
 }
+

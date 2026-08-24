@@ -134,3 +134,20 @@ type KillSwitchStatus struct {
 	TriggeredAt *time.Time `json:"triggered_at,omitempty"`
 	Reason      string     `json:"reason,omitempty"`
 }
+
+// AdaptiveProfile represents AI-driven real-time market habit adaptation and optimal parameters.
+type AdaptiveProfile struct {
+	SessionName        string    `json:"session_name"`         // "TOKYO", "LONDON", "NEW_YORK", "DYNAMIC_EVENT"
+	MarketHabit        string    `json:"market_habit"`         // "レンジ収束型", "高ボラティリティ拡散型", "強トレンド片道型"
+	EdgeHealthScore    int       `json:"edge_health_score"`    // 0 - 100 (100 is maximum edge)
+	RecommendedBBStd   float64   `json:"recommended_bb_std"`   // e.g. 2.5
+	RecommendedRSIOS   float64   `json:"recommended_rsi_os"`   // e.g. 25.0
+	RecommendedRSIOB   float64   `json:"recommended_rsi_ob"`   // e.g. 75.0
+	RecommendedADX     float64   `json:"recommended_adx"`      // e.g. 20.0
+	RecommendedATRFactor float64 `json:"recommended_atr_factor"`// e.g. 1.3
+	RecommendedTimeout int       `json:"recommended_timeout"` // e.g. 60 min
+	RecommendedLot     float64   `json:"recommended_lot"`     // e.g. 0.20
+	DecayWarning       bool      `json:"decay_warning"`        // true if strategy edge is decaying
+	ActionRationale    string    `json:"action_rationale"`    // AI explanation of adaptation
+	AdaptedAt          time.Time `json:"adapted_at"`
+}

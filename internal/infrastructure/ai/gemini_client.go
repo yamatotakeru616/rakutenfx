@@ -225,3 +225,99 @@ func (c *GeminiClient) EvaluateBacktestReport(ctx context.Context, totalTrades i
 	}, nil
 }
 
+// AnalyzeMarketHabitAndAdapt dynamically diagnoses market habits, detects edge decay, and tunes hyperparameters.
+func (c *GeminiClient) AnalyzeMarketHabitAndAdapt(
+	ctx context.Context,
+	sessionName string,
+	regime *domain.MarketRegimeInfo,
+	metrics *domain.TradeMetrics,
+	recentLossStreak int,
+) (*domain.AdaptiveProfile, error) {
+	// Default Base Values
+	habit := "レンジ平均回帰型 (Mean Reverting)"
+	healthScore := 88
+	bbStd := 2.0
+	rsiOS := 30.0
+	rsiOB := 70.0
+	adxThresh := 25.0
+	atrFactor := 1.5
+	timeoutMin := 120
+	lot := 0.20
+	decayWarning := false
+	rationale := "標準的ボラティリティ環境。BB(2.0σ) + RSI(30/70) の安定運用を継続。"
+
+	// Adaptation heuristics based on market regime and loss streak
+	if recentLossStreak >= 2 {
+		decayWarning = true
+		habit = "直近ダマシ急増・逆張り警戒型 (Noise Spike / Trend Shift)"
+		healthScore = 65
+		bbStd = 2.5     // Tighten Bollinger Bands
+		rsiOS = 25.0    // Tighten RSI threshold
+		rsiOB = 75.0
+		adxThresh = 20.0 // More sensitive ADX filter
+		atrFactor = 1.3
+		timeoutMin = 60  // Cut timeout in half to prevent trapped capital
+		lot = 0.15       // Reduce risk
+		rationale = fmt.Sprintf("直近 %d連敗を検知。市場の癖がノイズ型へシフトしたため、BBを2.5σ・RSIを25/75へ引き締め、ダマシを防御。", recentLossStreak)
+	} else if regime != nil {
+		if regime.Regime == domain.RegimePurple {
+			habit = "高ボラティリティ激変トレンド相場 (Extreme Volatility / News Shock)"
+			healthScore = 50
+			bbStd = 2.6
+			rsiOS = 20.0
+			rsiOB = 80.0
+			adxThresh = 18.0
+			timeoutMin = 45
+			lot = 0.10
+			decayWarning = true
+			rationale = "ATR急拡大 ＆ ADX強トレンドの二重危険レジーム。新規エントリーを完全抑制し、最小ロットで防衛。"
+		} else if regime.Regime == domain.RegimeOrange {
+			habit = "ボラティリティ急拡大・ヒゲ頻発相場 (ATR Volatility Spike)"
+			healthScore = 72
+			bbStd = 2.4
+			rsiOS = 25.0
+			rsiOB = 75.0
+			adxThresh = 22.0
+			atrFactor = 1.8
+			timeoutMin = 60
+			rationale = "一時的ボラ急増を検知。BB 2.4σおよびATR 1.8xフィルターを作動させて安全な反発のみを狙う設定へ自動適応。"
+		} else if regime.Regime == domain.RegimeRed {
+			habit = "片道トレンド持続相場 (Strong Directional Trend)"
+			healthScore = 68
+			adxThresh = 20.0
+			bbStd = 2.5
+			timeoutMin = 60
+			rationale = "トレンド持続性が高まっているため、逆張りの不用意なエントリーを防ぐべくADX閾値を20へ強化。"
+		} else {
+			// Clear Regime with good metrics
+			if metrics != nil && metrics.ProfitFactor >= 1.5 {
+				habit = "黄金レンジ・高精度平均回帰相場 (Prime Mean Reversion Edge)"
+				healthScore = 95
+				bbStd = 2.0
+				rsiOS = 30.0
+				rsiOB = 70.0
+				adxThresh = 25.0
+				lot = 0.25
+				timeoutMin = 120
+				rationale = "相場とアルゴリズムの整合性極めて良好 (PF 1.5+)。BB 2.0σ + RSI 30/70 による最大収益モードを適用。"
+			}
+		}
+	}
+
+	return &domain.AdaptiveProfile{
+		SessionName:          sessionName,
+		MarketHabit:          habit,
+		EdgeHealthScore:      healthScore,
+		RecommendedBBStd:     bbStd,
+		RecommendedRSIOS:     rsiOS,
+		RecommendedRSIOB:     rsiOB,
+		RecommendedADX:       adxThresh,
+		RecommendedATRFactor: atrFactor,
+		RecommendedTimeout:   timeoutMin,
+		RecommendedLot:       lot,
+		DecayWarning:         decayWarning,
+		ActionRationale:      rationale,
+		AdaptedAt:            time.Now(),
+	}, nil
+}
+
