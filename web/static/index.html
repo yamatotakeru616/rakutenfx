@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <main class="cockpit-container" role="main" aria-label="Rakuten FX Main Dashboard">
+    <main class="cockpit-container" aria-label="Rakuten FX Main Dashboard">
         <!-- Top Navigation Bar -->
         <header class="hud-header" role="banner">
             <div class="hud-brand">
@@ -56,7 +56,7 @@
         <!-- ========================================================================= -->
         <!-- TAB 1: LIVE MONITORING VIEW                                              -->
         <!-- ========================================================================= -->
-        <div id="view-live" class="tab-view active" role="region" aria-label="Live Trading Cockpit">
+        <section id="view-live" class="tab-view active" aria-label="Live Trading Cockpit">
             <!-- KPI Metrics Ribbon -->
             <section class="kpi-grid" aria-label="Key Performance Indicators">
                 <div class="kpi-card glow-cyan">
@@ -109,7 +109,7 @@
             </section>
 
             <!-- Main Dashboard Split Grid -->
-            <div class="dashboard-main-grid" role="region" aria-label="Live Chart and AI Analyst Grid">
+            <section class="dashboard-main-grid" aria-label="Live Chart and AI Analyst Grid">
                 <!-- Left: Equity Curve Chart & 4-State Filter Subpanel -->
                 <section class="chart-section glass-panel">
                     <div class="panel-header">
@@ -210,7 +210,7 @@
                         </div>
                     </div>
                 </section>
-            </div>
+            </section>
 
             <!-- Bottom: Closed Trades Ledger -->
             <section class="trades-ledger glass-panel">
@@ -240,12 +240,12 @@
                     </table>
                 </div>
             </section>
-        </div>
+        </section>
 
         <!-- ========================================================================= -->
         <!-- TAB 2: 1-YEAR BACKTEST & GRID OPTIMIZER VIEW                             -->
         <!-- ========================================================================= -->
-        <div id="view-backtest" class="tab-view" role="region" aria-label="1-Year Backtest and Optimizer Cockpit">
+        <section id="view-backtest" class="tab-view" aria-label="1-Year Backtest and Optimizer Cockpit">
             <!-- Backtest Control Bar -->
             <section class="backtest-controls glass-panel">
                 <div class="control-header">
@@ -363,7 +363,7 @@
             </section>
 
             <!-- Backtest Main Visual Split -->
-            <div class="dashboard-main-grid" role="region" aria-label="1-Year Backtest Charts and Ranking Grid">
+            <section class="dashboard-main-grid" aria-label="1-Year Backtest Charts and Ranking Grid">
                 <!-- Left: 1-Year Equity Curve & Monthly Bars -->
                 <section class="chart-section glass-panel">
                     <div class="panel-header">
@@ -451,8 +451,8 @@
                         </div>
                     </div>
                 </section>
-            </div>
-        </div>
+            </section>
+        </section>
 
         <!-- Footer -->
         <footer class="hud-footer" role="contentinfo">
