@@ -291,16 +291,16 @@ func (c *GeminiClient) AnalyzeMarketHabitAndAdapt(
 			rationale = "トレンド持続性が高まっているため、逆張りの不用意なエントリーを防ぐべくADX閾値を20へ強化。"
 		default:
 			// Clear Regime with good metrics
-			if metrics != nil && metrics.ProfitFactor >= 1.5 {
+			if metrics != nil && metrics.ProfitFactor >= 1.3 {
 				habit = "黄金レンジ・高精度平均回帰相場 (Prime Mean Reversion Edge)"
 				healthScore = 95
-				bbStd = 2.0
-				rsiOS = 30.0
-				rsiOB = 70.0
+				bbStd = 2.5
+				rsiOS = 25.0
+				rsiOB = 75.0
 				adxThresh = 25.0
 				lot = 0.25
-				timeoutMin = 120
-				rationale = "相場とアルゴリズムの整合性極めて良好 (PF 1.5+)。BB 2.0σ + RSI 30/70 による最大収益モードを適用。"
+				timeoutMin = 60
+				rationale = "相場とアルゴリズムの整合性極めて良好 (PF 1.3+)。BB 2.5σ + RSI 25/75 ＆ 60分タイムアウトによる最大収益＆低DDモードを適用。"
 			}
 		}
 	}

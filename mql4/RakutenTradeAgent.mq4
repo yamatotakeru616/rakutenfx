@@ -34,8 +34,12 @@ input int    FibLookbackBars = 50;      // Lookback Bars
 
 // --- 戦略技術仕様: マルチフィルタ型逆張りアルゴリズム設定 ---
 input string StrategyHeader = "=== MULTI-FILTER MEAN REVERSION ===";
+input double InpBB_Deviation = 2.5;     // ボリンジャーバンド標準偏差 (σ, 最適値: 2.5)
+input double InpRSI_Oversold = 25.0;    // RSI 売られすぎ閾値 (最適値: 25.0)
+input double InpRSI_Overbought = 75.0;  // RSI 買われすぎ閾値 (最適値: 75.0)
+input double InpADX_Threshold = 25.0;   // ADX トレンド上限閾値 (最適値: 25.0)
 input int    PyramiddingMax = 2;        // ピラミッティング上限 (最大ポジション数)
-input int    TimeoutMinutes = 120;      // タイムベース強制決済 (分, 0で無効)
+input int    TimeoutMinutes = 60;       // タイムベース強制決済 (分, 最適値: 60分)
 
 // --- 資金管理・プロクオンツリスク設定 (10万円スタート・許容損失2%・RR 1:2.0) ---
 input string MoneyMgmtHeader    = "=== MONEY MANAGEMENT (2% RISK, RR 1:2.0) ===";
