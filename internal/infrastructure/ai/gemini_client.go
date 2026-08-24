@@ -260,7 +260,8 @@ func (c *GeminiClient) AnalyzeMarketHabitAndAdapt(
 		lot = 0.15       // Reduce risk
 		rationale = fmt.Sprintf("直近 %d連敗を検知。市場の癖がノイズ型へシフトしたため、BBを2.5σ・RSIを25/75へ引き締め、ダマシを防御。", recentLossStreak)
 	} else if regime != nil {
-		if regime.Regime == domain.RegimePurple {
+		switch regime.Regime {
+		case domain.RegimePurple:
 			habit = "高ボラティリティ激変トレンド相場 (Extreme Volatility / News Shock)"
 			healthScore = 50
 			bbStd = 2.6
@@ -271,7 +272,7 @@ func (c *GeminiClient) AnalyzeMarketHabitAndAdapt(
 			lot = 0.10
 			decayWarning = true
 			rationale = "ATR急拡大 ＆ ADX強トレンドの二重危険レジーム。新規エントリーを完全抑制し、最小ロットで防衛。"
-		} else if regime.Regime == domain.RegimeOrange {
+		case domain.RegimeOrange:
 			habit = "ボラティリティ急拡大・ヒゲ頻発相場 (ATR Volatility Spike)"
 			healthScore = 72
 			bbStd = 2.4
@@ -281,14 +282,14 @@ func (c *GeminiClient) AnalyzeMarketHabitAndAdapt(
 			atrFactor = 1.8
 			timeoutMin = 60
 			rationale = "一時的ボラ急増を検知。BB 2.4σおよびATR 1.8xフィルターを作動させて安全な反発のみを狙う設定へ自動適応。"
-		} else if regime.Regime == domain.RegimeRed {
+		case domain.RegimeRed:
 			habit = "片道トレンド持続相場 (Strong Directional Trend)"
 			healthScore = 68
 			adxThresh = 20.0
 			bbStd = 2.5
 			timeoutMin = 60
 			rationale = "トレンド持続性が高まっているため、逆張りの不用意なエントリーを防ぐべくADX閾値を20へ強化。"
-		} else {
+		default:
 			// Clear Regime with good metrics
 			if metrics != nil && metrics.ProfitFactor >= 1.5 {
 				habit = "黄金レンジ・高精度平均回帰相場 (Prime Mean Reversion Edge)"

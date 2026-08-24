@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rakuten FX Pro Trader Cockpit - Multi-Filter Mean Reversion & 1-Year Backtest Engine</title>
+    <title>Rakuten FX Pro Trader Cockpit - Multi-Filter &amp; Backtest</title>
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,9 +13,9 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="cockpit-container">
+    <main class="cockpit-container" role="main" aria-label="Rakuten FX Main Dashboard">
         <!-- Top Navigation Bar -->
-        <header class="hud-header">
+        <header class="hud-header" role="banner">
             <div class="hud-brand">
                 <div class="hud-logo-icon">⚡</div>
                 <div class="brand-text">
@@ -26,11 +26,11 @@
 
             <!-- Tab Switcher -->
             <div class="hud-nav-tabs">
-                <button class="nav-tab-btn active" id="tab-btn-live" onclick="switchTab('live')">
+                <button type="button" class="nav-tab-btn active" id="tab-btn-live" onclick="switchTab('live')">
                     🔴 LIVE MONITORING
                 </button>
-                <button class="nav-tab-btn" id="tab-btn-backtest" onclick="switchTab('backtest')">
-                    📊 1-YEAR BACKTEST & OPTIMIZER
+                <button type="button" class="nav-tab-btn" id="tab-btn-backtest" onclick="switchTab('backtest')">
+                    📊 1-YEAR BACKTEST &amp; OPTIMIZER
                 </button>
             </div>
 
@@ -47,7 +47,7 @@
                 <div class="status-badge killswitch-badge" id="hud-killswitch-status">
                     <span>KILL-SWITCH: NORMAL</span>
                 </div>
-                <button class="kill-switch-btn" id="kill-switch-btn" onclick="toggleKillSwitch()">
+                <button type="button" class="kill-switch-btn" id="kill-switch-btn" onclick="toggleKillSwitch()">
                     🚨 KILL
                 </button>
             </div>
@@ -56,9 +56,9 @@
         <!-- ========================================================================= -->
         <!-- TAB 1: LIVE MONITORING VIEW                                              -->
         <!-- ========================================================================= -->
-        <div id="view-live" class="tab-view active">
+        <div id="view-live" class="tab-view active" role="region" aria-label="Live Trading Cockpit">
             <!-- KPI Metrics Ribbon -->
-            <section class="kpi-grid">
+            <section class="kpi-grid" aria-label="Key Performance Indicators">
                 <div class="kpi-card glow-cyan">
                     <div class="kpi-header">
                         <span class="kpi-title">NET PROFIT (総損益)</span>
@@ -102,18 +102,18 @@
                     </div>
                     <div class="kpi-value highlight-orange" id="kpi-max-drawdown">¥0 (0.0%)</div>
                     <div class="kpi-meta">
-                        <span>推奨ロット: <strong id="kpi-recommended-lot" class="lot-pill">0.25 Lot</strong></span>
+                        <span>推奨ロット: <strong id="kpi-recommended-lot" class="lot-pill">0.20 Lot</strong></span>
                         <span>最大敗: <strong id="kpi-largest-loss">¥0</strong></span>
                     </div>
                 </div>
             </section>
 
             <!-- Main Dashboard Split Grid -->
-            <main class="dashboard-main-grid">
+            <div class="dashboard-main-grid" role="region" aria-label="Live Chart and AI Analyst Grid">
                 <!-- Left: Equity Curve Chart & 4-State Filter Subpanel -->
                 <section class="chart-section glass-panel">
                     <div class="panel-header">
-                        <h2>📈 LIVE EQUITY CURVE & PERFORMANCE ACCUMULATION</h2>
+                        <h2>📈 LIVE EQUITY CURVE &amp; PERFORMANCE ACCUMULATION</h2>
                         <span class="refresh-indicator" id="chart-refresh-status">Real-time sync</span>
                     </div>
                     <div class="chart-container">
@@ -123,8 +123,8 @@
                     <!-- 4-State Multi-Filter & Strategy Signals Subpanel -->
                     <div class="signals-subpanel">
                         <div class="panel-header">
-                            <h3>⚡ 4-STATE MULTI-FILTER & REVERSE / PYRAMIDDING SIGNALS</h3>
-                            <button class="small-btn" onclick="fetchSignals(); fetchRegime();">Refresh</button>
+                            <h3>⚡ 4-STATE MULTI-FILTER &amp; REVERSE / PYRAMIDDING SIGNALS</h3>
+                            <button type="button" class="small-btn" onclick="fetchSignals(); fetchRegime();">Refresh</button>
                         </div>
 
                         <!-- 4-State Visual Indicator Bar -->
@@ -144,35 +144,35 @@
                 <!-- Right: Gemini AI Chief Analyst & AI Co-Evolution Karte -->
                 <section class="ai-analyst-section glass-panel">
                     <div class="panel-header">
-                        <h2>🤖 GEMINI AI CO-EVOLUTION & QUANT ANALYST</h2>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="ai-eval-btn" id="ai-adapt-btn" onclick="triggerAiAdaptation()" style="background: linear-gradient(135deg, #00ff88, #0088ff); color: #060913;">
+                        <h2>🤖 GEMINI AI CO-EVOLUTION &amp; QUANT ANALYST</h2>
+                        <div class="header-btn-group">
+                            <button type="button" class="ai-eval-btn ai-adapt-btn" id="ai-adapt-btn" onclick="triggerAiAdaptation()">
                                 ⚡ 即時AI適応を実行
                             </button>
-                            <button class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
+                            <button type="button" class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
                                 ✨ RUN AI DIAGNOSIS
                             </button>
                         </div>
                     </div>
 
                     <!-- AI Co-Evolution Market Habit Karte -->
-                    <div class="ai-karte-panel" id="ai-karte-panel" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--accent-cyan);">🧠 AI相場適応カルテ (陳腐化防止・共創エンジン)</span>
-                            <span id="karte-edge-health" style="font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(0,255,136,0.15); color: var(--accent-green); font-weight: 700;">エッジ健全度: 92/100</span>
+                    <div class="ai-karte-panel" id="ai-karte-panel">
+                        <div class="ai-karte-header">
+                            <span class="ai-karte-title">🧠 AI相場適応カルテ (陳腐化防止・共創エンジン)</span>
+                            <span id="karte-edge-health" class="ai-karte-health-badge">エッジ健全度: 92/100</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; font-family: var(--font-mono); margin-bottom: 10px;">
+                        <div class="ai-karte-grid">
                             <div>
-                                <span style="color: var(--text-muted);">検出された市場の癖:</span>
-                                <strong id="karte-market-habit" style="color: var(--accent-gold); display: block;">レンジ平均回帰型 (Mean Reverting)</strong>
+                                <span class="ai-karte-label">検出された市場の癖:</span>
+                                <strong id="karte-market-habit" class="ai-karte-value-habit">レンジ平均回帰型 (Mean Reverting)</strong>
                             </div>
                             <div>
-                                <span style="color: var(--text-muted);">動的適応パラメータ:</span>
-                                <strong id="karte-params" style="color: var(--text-highlight); display: block;">BB: 2.0σ | RSI: 30/70 | ADX: 25 | 0.20L</strong>
+                                <span class="ai-karte-label">動的適応パラメータ:</span>
+                                <strong id="karte-params" class="ai-karte-value-params">BB: 2.0σ | RSI: 30/70 | ADX: 25 | 0.20L</strong>
                             </div>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-main); background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border-left: 3px solid var(--accent-cyan);">
-                            <span style="color: var(--text-muted);">AIクオンツ適応根拠: </span>
+                        <div class="ai-karte-rationale-box">
+                            <span class="ai-karte-label">AIクオンツ適応根拠: </span>
                             <span id="karte-rationale">直近相場データを精査中。市場の構造変化と手法の整合性をリアルタイムで最適化しています。</span>
                         </div>
                     </div>
@@ -196,7 +196,7 @@
                             </div>
 
                             <div class="point-box weaknesses">
-                                <h4>⚠️ 改善課題 & アクションプラン (Action Plan)</h4>
+                                <h4>⚠️ 改善課題 &amp; アクションプラン (Action Plan)</h4>
                                 <ul id="ai-weaknesses-list">
                                     <li>土転 (Reverse) ＆ ピラミッティング (最大2) の確実な遂行</li>
                                     <li>タイムベース強制決済 (120分) による資金拘束リスク排除</li>
@@ -210,7 +210,7 @@
                         </div>
                     </div>
                 </section>
-            </main>
+            </div>
 
             <!-- Bottom: Closed Trades Ledger -->
             <section class="trades-ledger glass-panel">
@@ -222,16 +222,16 @@
                     <table class="hud-table">
                         <thead>
                             <tr>
-                                <th>Ticket</th>
-                                <th>Symbol</th>
-                                <th>Action</th>
-                                <th>Lots</th>
-                                <th>Open Price</th>
-                                <th>Close Price</th>
-                                <th>Open Time</th>
-                                <th>Close Time</th>
-                                <th>Profit</th>
-                                <th>Strategy Comment</th>
+                                <th scope="col">Ticket</th>
+                                <th scope="col">Symbol</th>
+                                <th scope="col">Action</th>
+                                <th scope="col">Lots</th>
+                                <th scope="col">Open Price</th>
+                                <th scope="col">Close Price</th>
+                                <th scope="col">Open Time</th>
+                                <th scope="col">Close Time</th>
+                                <th scope="col">Profit</th>
+                                <th scope="col">Strategy Comment</th>
                             </tr>
                         </thead>
                         <tbody id="trades-table-body">
@@ -245,7 +245,7 @@
         <!-- ========================================================================= -->
         <!-- TAB 2: 1-YEAR BACKTEST & GRID OPTIMIZER VIEW                             -->
         <!-- ========================================================================= -->
-        <div id="view-backtest" class="tab-view">
+        <div id="view-backtest" class="tab-view" role="region" aria-label="1-Year Backtest and Optimizer Cockpit">
             <!-- Backtest Control Bar -->
             <section class="backtest-controls glass-panel">
                 <div class="control-header">
@@ -254,13 +254,13 @@
                         <span class="control-desc">M1足 37万本 ＆ 4ステート相場レジーム (Purple/Orange/Red/Clear) / 120分タイムアウト / 土転 / ピラミッティング2</span>
                     </div>
                     <div class="control-actions">
-                        <button class="action-btn run-btn" id="btn-run-backtest" onclick="runOneYearBacktest()">
+                        <button type="button" class="action-btn run-btn" id="btn-run-backtest" onclick="runOneYearBacktest()">
                             🚀 1年バックテスト実行
                         </button>
-                        <button class="action-btn optimize-btn" id="btn-optimize-backtest" onclick="runGridOptimization()">
+                        <button type="button" class="action-btn optimize-btn" id="btn-optimize-backtest" onclick="runGridOptimization()">
                             ⚡ グリッド最適化 (PF探索)
                         </button>
-                        <button class="action-btn export-btn" onclick="exportBacktestCsv()">
+                        <button type="button" class="action-btn export-btn" onclick="exportBacktestCsv()">
                             📥 CSVエクスポート
                         </button>
                     </div>
@@ -269,50 +269,50 @@
                 <!-- Parameters Tuning Strip -->
                 <div class="params-strip">
                     <div class="param-item">
-                        <label>BB StdDev (σ): <span id="val-bb-std">2.0</span></label>
+                        <label for="param-bb-std">BB StdDev (σ): <span id="val-bb-std">2.0</span></label>
                         <input type="range" id="param-bb-std" min="1.5" max="3.0" step="0.1" value="2.0" oninput="document.getElementById('val-bb-std').textContent=this.value">
                     </div>
                     <div class="param-item">
-                        <label>RSI Oversold / Overbought: <span id="val-rsi">30 / 70</span></label>
+                        <label for="param-rsi">RSI Oversold / Overbought: <span id="val-rsi">30 / 70</span></label>
                         <input type="range" id="param-rsi" min="20" max="40" step="5" value="30" oninput="document.getElementById('val-rsi').textContent=this.value+' / '+(100-this.value)">
                     </div>
                     <div class="param-item">
-                        <label>ADX Threshold: <span id="val-adx">25</span></label>
+                        <label for="param-adx">ADX Threshold: <span id="val-adx">25</span></label>
                         <input type="range" id="param-adx" min="15" max="35" step="1" value="25" oninput="document.getElementById('val-adx').textContent=this.value">
                     </div>
                     <div class="param-item">
-                        <label>ATR Factor: <span id="val-atr">1.5x</span></label>
+                        <label for="param-atr">ATR Factor: <span id="val-atr">1.5x</span></label>
                         <input type="range" id="param-atr" min="1.0" max="2.5" step="0.1" value="1.5" oninput="document.getElementById('val-atr').textContent=this.value+'x'">
                     </div>
                     <div class="param-item">
-                        <label>Timeout (min): <span id="val-timeout">120</span></label>
+                        <label for="param-timeout">Timeout (min): <span id="val-timeout">120</span></label>
                         <input type="range" id="param-timeout" min="30" max="240" step="30" value="120" oninput="document.getElementById('val-timeout').textContent=this.value">
                     </div>
                     <div class="param-item">
-                        <label>JST Session (時): <span id="val-jst-hours">16:00 - 24:00</span></label>
-                        <select id="param-jst-preset" class="hud-select" onchange="updateJstPreset(this.value)" style="background: rgba(0,0,0,0.5); color: var(--accent-gold); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-family: var(--font-mono); font-size: 11px;">
+                        <label for="param-jst-preset">JST Session (時): <span id="val-jst-hours">16:00 - 24:00</span></label>
+                        <select id="param-jst-preset" class="hud-select hud-select-preset" onchange="updateJstPreset(this.value)">
                             <option value="16-24" selected>JST 16:00 - 24:00 (欧州・NY前)</option>
                             <option value="09-24">JST 09:00 - 24:00 (東京〜NY)</option>
                             <option value="00-24">JST 24時間フル稼働</option>
                         </select>
                     </div>
                     <div class="param-item">
-                        <label>Risk Per Trade (% / JPY): <span id="val-risk-pct">2.0% (¥2,000)</span></label>
+                        <label for="param-risk-pct">Risk Per Trade (% / JPY): <span id="val-risk-pct">2.0% (¥2,000)</span></label>
                         <input type="range" id="param-risk-pct" min="1.0" max="5.0" step="0.5" value="2.0" oninput="document.getElementById('val-risk-pct').textContent=this.value+'% (¥'+(this.value*1000).toLocaleString()+')'">
                     </div>
                     <div class="param-item">
-                        <label>Risk:Reward (RR): <span id="val-rr-ratio">1 : 2.0</span></label>
+                        <label for="param-rr-ratio">Risk:Reward (RR): <span id="val-rr-ratio">1 : 2.0</span></label>
                         <input type="range" id="param-rr-ratio" min="1.0" max="3.0" step="0.2" value="2.0" oninput="document.getElementById('val-rr-ratio').textContent='1 : '+parseFloat(this.value).toFixed(1)">
                     </div>
                     <div class="param-item">
-                        <label>StopLoss / TakeProfit: <span id="val-sl-pips">10p / 20p</span></label>
+                        <label for="param-sl-pips">StopLoss / TakeProfit: <span id="val-sl-pips">10p / 20p</span></label>
                         <input type="range" id="param-sl-pips" min="5" max="25" step="1" value="10" oninput="document.getElementById('val-sl-pips').textContent=this.value+'p / '+(this.value*parseFloat(document.getElementById('param-rr-ratio').value))+'p'">
                     </div>
                 </div>
             </section>
 
             <!-- Backtest KPI Ribbon -->
-            <section class="kpi-grid">
+            <section class="kpi-grid" aria-label="Backtest Performance Metrics">
                 <div class="kpi-card glow-cyan">
                     <div class="kpi-header">
                         <span class="kpi-title">1-YEAR NET PROFIT</span>
@@ -363,7 +363,7 @@
             </section>
 
             <!-- Backtest Main Visual Split -->
-            <main class="dashboard-main-grid">
+            <div class="dashboard-main-grid" role="region" aria-label="1-Year Backtest Charts and Ranking Grid">
                 <!-- Left: 1-Year Equity Curve & Monthly Bars -->
                 <section class="chart-section glass-panel">
                     <div class="panel-header">
@@ -378,7 +378,7 @@
                         <div class="panel-header">
                             <h3>📅 MONTHLY PROFIT / LOSS BREAKDOWN</h3>
                         </div>
-                        <div class="monthly-chart-container" style="height: 180px; position: relative;">
+                        <div class="monthly-chart-container">
                             <canvas id="monthlyChart"></canvas>
                         </div>
                     </div>
@@ -423,25 +423,25 @@
                             <div class="panel-header">
                                 <h3>🏆 TOP HYPERPARAMETER CONFIGURATIONS (Grid Search)</h3>
                             </div>
-                            <div class="table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                            <div class="table-wrapper scrollable-ranking-wrapper">
                                 <table class="hud-table small-table">
                                     <thead>
                                         <tr>
-                                            <th>Rank</th>
-                                            <th>PF</th>
-                                            <th>WinRate</th>
-                                            <th>Net Profit</th>
-                                            <th>MaxDD</th>
-                                            <th>Trades</th>
-                                            <th>BB σ</th>
-                                            <th>RSI</th>
-                                            <th>ADX</th>
-                                            <th>Timeout</th>
+                                            <th scope="col">Rank</th>
+                                            <th scope="col">PF</th>
+                                            <th scope="col">WinRate</th>
+                                            <th scope="col">Net Profit</th>
+                                            <th scope="col">MaxDD</th>
+                                            <th scope="col">Trades</th>
+                                            <th scope="col">BB σ</th>
+                                            <th scope="col">RSI</th>
+                                            <th scope="col">ADX</th>
+                                            <th scope="col">Timeout</th>
                                         </tr>
                                     </thead>
                                     <tbody id="grid-ranking-tbody">
                                         <tr>
-                                            <td colspan="10" style="text-align: center; color: var(--text-muted);">
+                                            <td colspan="10" class="table-placeholder-cell">
                                                 「グリッド最適化」を実行すると上位ランキングが表示されます
                                             </td>
                                         </tr>
@@ -451,15 +451,15 @@
                         </div>
                     </div>
                 </section>
-            </main>
+            </div>
         </div>
 
         <!-- Footer -->
-        <footer class="hud-footer">
-            <span>RAKUTEN FX QUANT COCKPIT v2.2 // MULTI-FILTER MEAN REVERSION & 1-YEAR BACKTEST ENGINE</span>
+        <footer class="hud-footer" role="contentinfo">
+            <span>RAKUTEN FX QUANT COCKPIT v2.3 // MULTI-FILTER MEAN REVERSION &amp; AI CO-EVOLUTION</span>
             <span>TCP PORT: 5555 (Rust) / 5556 (Go IPC) / 8080 (REST + WS)</span>
         </footer>
-    </div>
+    </main>
 
     <script src="/static/js/app.js"></script>
 </body>

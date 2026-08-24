@@ -703,6 +703,106 @@ body {
     font-size: 11px;
 }
 
+/* AI Co-Evolution Karte Panel */
+.ai-karte-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.ai-karte-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.ai-karte-title {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+}
+
+.ai-karte-health-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--accent-green);
+    font-weight: 700;
+}
+
+.ai-karte-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    margin-bottom: 10px;
+}
+
+.ai-karte-label {
+    color: var(--text-muted);
+}
+
+.ai-karte-value-habit {
+    color: var(--accent-gold);
+    display: block;
+}
+
+.ai-karte-value-params {
+    color: var(--text-highlight);
+    display: block;
+}
+
+.ai-karte-rationale-box {
+    font-size: 11px;
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 8px;
+    border-radius: 4px;
+    border-left: 3px solid var(--accent-cyan);
+}
+
+.ai-adapt-btn {
+    background: linear-gradient(135deg, #00ff88, #0088ff);
+    color: #060913;
+}
+
+.header-btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.hud-select-preset {
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--accent-gold);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.monthly-chart-container {
+    height: 180px;
+    position: relative;
+}
+
+.scrollable-ranking-wrapper {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.table-placeholder-cell {
+    text-align: center;
+    color: var(--text-muted);
+}
+
 /* Footer */
 .hud-footer {
     display: flex;
