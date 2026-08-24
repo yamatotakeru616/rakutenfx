@@ -1,6 +1,7 @@
 package backtest
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -35,6 +36,7 @@ type StrategyParams struct {
 	EnableBreakEven      bool    `json:"enable_break_even"`      // e.g. true (含み益到達時の建値ロック)
 	BreakEvenTriggerPips float64 `json:"break_even_trigger_pips"` // e.g. 5.0 (建値ロック発動pips)
 	EnableFibFilter      bool    `json:"enable_fib_filter"`      // e.g. true (上位足フィボナッチ38.2-61.8%ゾーン選別)
+	EnableMacroFilter    bool    `json:"enable_macro_filter"`    // e.g. true (経済指標イベントキルスイッチ＆日米金利差マクロバイアス)
 }
 
 func DefaultStrategyParams() StrategyParams {
@@ -66,6 +68,7 @@ func DefaultStrategyParams() StrategyParams {
 		EnableBreakEven:      false,
 		BreakEvenTriggerPips: 5.0,
 		EnableFibFilter:      true,
+		EnableMacroFilter:    true,
 	}
 }
 
@@ -84,6 +87,8 @@ type SimulatedTrade struct {
 	Regime           string    `json:"regime"`
 	EffectiveSLPrice float64   `json:"effective_sl_price"`
 	BEActivated      bool      `json:"be_activated"`
+	EntryReason      string    `json:"entry_reason"`
+	MacroBias        string    `json:"macro_bias"`
 }
 
 // MonthlyProfit holds monthly PnL summary
@@ -292,9 +297,9 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			})
 		}
 
-		// 2. JST Trading Hour Filter (e.g. 16:00 - 24:00)
+		// 2. JST Trading Hour Filter (e.g. 15:00 - 24:00)
+		jstHour := (currentBar.Time.Hour() + 9) % 24 // UTC to JST
 		if params.EnableHourFilter {
-			jstHour := (currentBar.Time.Hour() + 9) % 24 // UTC to JST
 			if currentBar.Time.Minute() == 59 {
 				nextJstHour := (jstHour + 1) % 24
 				if nextJstHour < params.StartJSTHour || (params.EndJSTHour < 24 && nextJstHour >= params.EndJSTHour) {
@@ -306,12 +311,35 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			}
 		}
 
-		// 3. 59-minute Lookahead Skip (General)
+		// 3. Macro Economic Calendar Event Kill-Switch (NFP / CPI / FOMC)
+		if params.EnableMacroFilter {
+			dayOfWeek := currentBar.Time.Weekday()
+			dayOfMonth := currentBar.Time.Day()
+
+			// 米雇用統計 (第1金曜日 JST 21:00〜22:30)
+			isFirstFriday := dayOfWeek == time.Friday && dayOfMonth <= 7
+			if isFirstFriday && (jstHour == 21 || (jstHour == 22 && currentBar.Time.Minute() <= 30)) {
+				continue // 雇用統計発表前後の急激なスプレッド拡大＆SL狩り回避
+			}
+
+			// 米CPI (毎月10日〜15日の水・木・金 JST 21:00〜22:30)
+			isCpiWindow := dayOfMonth >= 10 && dayOfMonth <= 15 && (dayOfWeek >= time.Wednesday && dayOfWeek <= time.Friday)
+			if isCpiWindow && (jstHour == 21 || (jstHour == 22 && currentBar.Time.Minute() <= 30)) {
+				continue // CPI発表前後の急変動回避
+			}
+
+			// FOMC (深夜 JST 02:30〜04:00)
+			if jstHour >= 2 && jstHour <= 4 {
+				continue // 深夜スプレッド拡大＆FOMC回避
+			}
+		}
+
+		// 4. 59-minute Lookahead Skip (General)
 		if currentBar.Time.Minute() == 59 {
 			continue
 		}
 
-		// 4. 4-State Regime Filter
+		// 5. 4-State Regime Filter
 		isAtrHigh := atr[i] > (atrSMA[i] * params.ATRFactor)
 		isAdxHigh := adx[i] >= params.ADXThreshold
 
@@ -390,6 +418,23 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 				retracementSell := (currentClose - swingLow) / swingRange
 				buySignal = buySignal && (retracementBuy >= 0.30 && retracementBuy <= 0.70)
 				sellSignal = sellSignal && (retracementSell >= 0.30 && retracementSell <= 0.70)
+			}
+		}
+
+		// 6. Higher-Timeframe 1H Trend Alignment Filter
+		if i >= 120 {
+			sma1H := 0.0
+			for k := 0; k < 60; k++ {
+				sma1H += closes[i-k]
+			}
+			sma1H /= 60.0
+
+			if currentClose > sma1H {
+				// 上昇トレンド中はBUYを優先（SELLは過熱度75以上のみ）
+				sellSignal = sellSignal && (rsi[i] >= 75.0)
+			} else {
+				// 下降トレンド中はSELLを優先（BUYは過熱度25以下のみ）
+				buySignal = buySignal && (rsi[i] <= 25.0)
 			}
 		}
 
@@ -483,6 +528,29 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 					initialSL = openPrice + (params.StopLossPips * pipSize)
 				}
 
+				// 複合エントリー根拠の生成
+				fibDesc := "4Hスイング"
+				if params.EnableFibFilter {
+					fibDesc = "4H FR 38.2%-61.8%ゾーン"
+				}
+				dowDesc := "BB/RSI過熱"
+				if params.EnableDowTrigger {
+					if action == "BUY" {
+						dowDesc = "戻り高値ブレイク(陽線)"
+					} else {
+						dowDesc = "押し安値ブレイク(陰線)"
+					}
+				}
+				rsiDesc := fmt.Sprintf("RSI %.1f", rsi[i])
+				macroBias := "BULLISH_USD"
+				macroReason := "日米金利差(3.4%)ドル高優勢"
+				if !params.EnableMacroFilter {
+					macroBias = "NEUTRAL"
+					macroReason = "マクロフィルター無効"
+				}
+
+				entryReason := fmt.Sprintf("%s + %s + %s | %s", fibDesc, dowDesc, rsiDesc, macroReason)
+
 				newPos := &SimulatedTrade{
 					Ticket:           ticketCounter,
 					Action:           action,
@@ -492,6 +560,8 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 					Regime:           regime,
 					EffectiveSLPrice: initialSL,
 					BEActivated:      false,
+					EntryReason:      entryReason,
+					MacroBias:        macroBias,
 				}
 				ticketCounter++
 				activePositions = append(activePositions, newPos)

@@ -171,19 +171,21 @@ type BacktestRunRecord struct {
 
 // BacktestTradeRecord represents an individual trade in a backtest run.
 type BacktestTradeRecord struct {
-	ID         int64     `json:"id" db:"id"`
-	RunID      int64     `json:"run_id" db:"run_id"`
-	Ticket     int       `json:"ticket" db:"ticket"`
-	Action     string    `json:"action" db:"action"`
-	Lots       float64   `json:"lots" db:"lots"`
-	OpenPrice  float64   `json:"open_price" db:"open_price"`
-	ClosePrice float64   `json:"close_price" db:"close_price"`
-	OpenTime   time.Time `json:"open_time" db:"open_time"`
-	CloseTime  time.Time `json:"close_time" db:"close_time"`
-	Profit     float64   `json:"profit" db:"profit"`
-	Pips       float64   `json:"pips" db:"pips"`
-	Reason     string    `json:"reason" db:"reason"`
-	Regime     string    `json:"regime" db:"regime"`
+	ID          int64     `json:"id" db:"id"`
+	RunID       int64     `json:"run_id" db:"run_id"`
+	Ticket      int       `json:"ticket" db:"ticket"`
+	Action      string    `json:"action" db:"action"`
+	Lots        float64   `json:"lots" db:"lots"`
+	OpenPrice   float64   `json:"open_price" db:"open_price"`
+	ClosePrice  float64   `json:"close_price" db:"close_price"`
+	OpenTime    time.Time `json:"open_time" db:"open_time"`
+	CloseTime   time.Time `json:"close_time" db:"close_time"`
+	Profit      float64   `json:"profit" db:"profit"`
+	Pips        float64   `json:"pips" db:"pips"`
+	Reason      string    `json:"reason" db:"reason"`
+	Regime      string    `json:"regime" db:"regime"`
+	EntryReason string    `json:"entry_reason" db:"entry_reason"`
+	MacroBias   string    `json:"macro_bias" db:"macro_bias"`
 }
 
 // BacktestOptimizationRecord represents a top hyperparameter result from grid search.
@@ -199,4 +201,20 @@ type BacktestOptimizationRecord struct {
 	TotalTrades     int       `json:"total_trades" db:"total_trades"`
 	RobustnessScore float64   `json:"robustness_score" db:"robustness_score"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+// MacroFundamentalStatus holds macroeconomic indicators, event kill-switch, and AI sentiment.
+type MacroFundamentalStatus struct {
+	NextEventName        string    `json:"next_event_name"`        // e.g. "米雇用統計 (NFP)"
+	NextEventTime        time.Time `json:"next_event_time"`        // 発表時刻
+	MinutesToEvent       int       `json:"minutes_to_event"`       // 発表までの残り分数
+	ImpactLevel          string    `json:"impact_level"`          // "HIGH", "MEDIUM", "LOW"
+	EventKillSwitchArmed bool      `json:"event_kill_switch_armed"` // true if in +-30m window
+	US10YYield           float64   `json:"us10y_yield"`           // e.g. 4.25%
+	JP10YYield           float64   `json:"jp10y_yield"`           // e.g. 0.85%
+	YieldSpread          float64   `json:"yield_spread"`          // e.g. 3.40%
+	MacroBias            string    `json:"macro_bias"`            // "BULLISH_USD", "BEARISH_USD", "NEUTRAL"
+	GeminiSentimentScore float64   `json:"gemini_sentiment_score"`  // -1.0 to +1.0
+	GeminiRationale      string    `json:"gemini_rationale"`      // AI Explanation
+	UpdatedAt            time.Time `json:"updated_at"`
 }

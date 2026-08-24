@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchRegime();
     fetchSystemStatus();
     fetchAdaptiveProfile();
+    fetchMacroStatus();
     connectWebSocket();
 });
 
@@ -254,7 +255,11 @@ async function runOneYearBacktest() {
         initial_balance: 100000.0,
         risk_percent: riskPct,
         risk_reward_ratio: rrRatio,
-        use_dynamic_risk_lot: true
+        use_dynamic_risk_lot: true,
+        enable_dow_trigger: true,
+        dow_lookback: 5,
+        enable_fib_filter: true,
+        enable_macro_filter: document.getElementById('param-macro-filter') ? document.getElementById('param-macro-filter').checked : true
     };
 
     try {
@@ -370,8 +375,59 @@ function updateBacktestAiUI(ai) {
     }
 }
 
+let currentRawTrades = [];
+let currentTradesFilter = 'ALL';
+let currentTradesSearchQuery = '';
+
+function setTradesFilter(type) {
+    currentTradesFilter = type;
+    document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.remove('active'));
+    const btnIdMap = {
+        'ALL': 'filter-btn-all',
+        'WINS': 'filter-btn-wins',
+        'LOSSES': 'filter-btn-losses',
+        'BUY': 'filter-btn-buy',
+        'SELL': 'filter-btn-sell'
+    };
+    const activeBtn = document.getElementById(btnIdMap[type]);
+    if (activeBtn) activeBtn.classList.add('active');
+    applyTradesFiltering();
+}
+
+function onTradeSearchInput(query) {
+    currentTradesSearchQuery = (query || '').toLowerCase().trim();
+    applyTradesFiltering();
+}
+
+function applyTradesFiltering() {
+    if (!currentRawTrades) return;
+    
+    let filtered = currentRawTrades.filter(t => {
+        // Filter by Status
+        if (currentTradesFilter === 'WINS' && t.profit <= 0) return false;
+        if (currentTradesFilter === 'LOSSES' && t.profit >= 0) return false;
+        if (currentTradesFilter === 'BUY' && t.action !== 'BUY') return false;
+        if (currentTradesFilter === 'SELL' && t.action !== 'SELL') return false;
+
+        // Filter by Search Query
+        if (currentTradesSearchQuery) {
+            const str = `${t.ticket} ${t.action} ${t.open_time} ${t.close_time} ${t.entry_reason || ''} ${t.reason || ''} ${t.macro_bias || ''}`.toLowerCase();
+            if (!str.includes(currentTradesSearchQuery)) return false;
+        }
+
+        return true;
+    });
+
+    renderFilteredTradesTable(filtered, currentViewingRunId);
+}
+
 // Render Selected Backtest Detailed Trades Table
 function renderBacktestTradesTable(trades, runId) {
+    currentRawTrades = trades || [];
+    applyTradesFiltering();
+}
+
+function renderFilteredTradesTable(trades, runId) {
     const tbody = document.getElementById('bt-trades-table-body');
     const counter = document.getElementById('bt-trades-counter');
     if (!tbody) return;
@@ -379,13 +435,14 @@ function renderBacktestTradesTable(trades, runId) {
     tbody.innerHTML = '';
 
     if (!trades || trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="table-placeholder-cell">約定明細データはありません</td></tr>';
-        if (counter) counter.textContent = runId ? `Run #${runId}: 0 trades` : '0 trades';
+        tbody.innerHTML = '<tr><td colspan="11" class="table-placeholder-cell">条件に一致する約定明細データはありません</td></tr>';
+        if (counter) counter.textContent = runId ? `Run #${runId}: 0 / ${currentRawTrades.length} trades` : '0 trades';
         return;
     }
 
     if (counter) {
-        counter.textContent = runId ? `Showing ${trades.length} trades for Run #${runId}` : `Showing ${trades.length} trades`;
+        const runText = runId ? `Run #${runId}: ` : '';
+        counter.textContent = `${runText}表示中 ${trades.length} 件 / 全 ${currentRawTrades.length} 件`;
     }
 
     // Render up to 500 trades efficiently
@@ -413,17 +470,30 @@ function renderBacktestTradesTable(trades, runId) {
         const openP = t.open_price ? t.open_price.toFixed(3) : '-';
         const closeP = t.close_price ? t.close_price.toFixed(3) : '-';
         const pipsVal = t.pips ? t.pips.toFixed(1) : '0.0';
+        const entryReason = t.entry_reason || 'BB+RSI 平均回帰';
+
+        let macroBadge = '';
+        if (t.macro_bias === 'BULLISH_USD') {
+            macroBadge = '<span class="macro-tag bullish">📈 USD高</span>';
+        } else if (t.macro_bias === 'BEARISH_USD') {
+            macroBadge = '<span class="macro-tag bearish">📉 円高</span>';
+        }
 
         tr.innerHTML = `
             <td>#${t.ticket || t.id}</td>
             <td><span class="action-tag ${t.action.toLowerCase()}">${t.action}</span></td>
             <td>${lotsVal} L</td>
-            <td>${openP}</td>
-            <td>${closeP}</td>
-            <td style="font-size: 11px; color: var(--text-muted);">${openDate}</td>
-            <td style="font-size: 11px; color: var(--text-muted);">${closeDate}</td>
+            <td style="font-size: 11px; font-family: var(--font-mono); color: var(--text-highlight);">${openDate}</td>
+            <td style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);">${closeDate}</td>
+            <td>
+                <div class="entry-rationale-cell">
+                    <span class="entry-reason-badge">${entryReason}</span>
+                    ${macroBadge}
+                </div>
+            </td>
+            <td style="font-size: 11px; font-family: var(--font-mono);">${openP} / ${closeP}</td>
+            <td class="${profitClass}"><strong>${pipsPrefix}${pipsVal}p</strong></td>
             <td class="${profitClass}"><strong>${profitPrefix}¥${Math.round(t.profit).toLocaleString()}</strong></td>
-            <td class="${profitClass}">${pipsPrefix}${pipsVal}p</td>
             <td>${reasonBadge}</td>
             <td><span class="regime-badge ${getRegimeBadgeClass(t.regime)}">${t.regime || 'CLEAR'}</span></td>
         `;
@@ -613,7 +683,11 @@ async function loadBacktestRunDetail(runId) {
 }
 
 function exportBacktestCsv() {
-    window.location.href = '/api/backtest/export';
+    let url = '/api/backtest/export';
+    if (currentViewingRunId) {
+        url += `?run_id=${currentViewingRunId}`;
+    }
+    window.location.href = url;
 }
 
 // --- Live Monitoring Logic ---
@@ -929,6 +1003,62 @@ async function runOptunaTuning() {
     }
 }
 
+// Macro & Fundamental Status
+async function fetchMacroStatus() {
+    try {
+        const res = await fetch('/api/macro/fundamental-status');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.next_event_name) {
+            updateMacroStatusUI(data);
+        }
+    } catch (e) {
+        console.error('Failed to fetch macro status:', e);
+    }
+}
+
+function updateMacroStatusUI(data) {
+    if (!data) return;
+    const badge = document.getElementById('macro-kill-badge');
+    const nextEvent = document.getElementById('macro-next-event');
+    const countdown = document.getElementById('macro-countdown');
+    const spread = document.getElementById('macro-spread');
+    const bias = document.getElementById('macro-bias');
+    const geminiScore = document.getElementById('macro-gemini-score');
+    const rationale = document.getElementById('macro-rationale');
+
+    if (badge) {
+        if (data.event_kill_switch_armed) {
+            badge.className = 'macro-badge armed';
+            badge.textContent = '🚨 ARMED (発表前後トレード停止)';
+        } else {
+            badge.className = 'macro-badge standby';
+            badge.textContent = '🟢 STANDBY (取引許可)';
+        }
+    }
+
+    if (nextEvent) nextEvent.textContent = data.next_event_name || '経済指標なし';
+    if (countdown) countdown.textContent = `残り ${data.minutes_to_event || 0} 分`;
+    if (spread) spread.textContent = `${(data.yield_spread || 0).toFixed(2)}% (US ${(data.us10y_yield || 0).toFixed(2)}% / JP ${(data.jp10y_yield || 0).toFixed(2)}%)`;
+    if (bias) {
+        if (data.macro_bias === 'BULLISH_USD') {
+            bias.textContent = '📈 BULLISH_USD (ドル買い優勢)';
+            bias.style.color = 'var(--accent-green)';
+        } else if (data.macro_bias === 'BEARISH_USD') {
+            bias.textContent = '📉 BEARISH_USD (円高警戒)';
+            bias.style.color = 'var(--accent-red)';
+        } else {
+            bias.textContent = '⚖️ NEUTRAL (中立)';
+            bias.style.color = 'var(--accent-cyan)';
+        }
+    }
+    if (geminiScore) {
+        const score = data.gemini_sentiment_score || 0;
+        geminiScore.textContent = `${score > 0 ? '+' : ''}${score.toFixed(2)} (${score > 0.3 ? 'タカ派・ドル高' : score < -0.3 ? 'ハト派・円高' : '中立'})`;
+    }
+    if (rationale) rationale.textContent = data.gemini_rationale || 'マクロ分析データを同期中...';
+}
+
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -954,6 +1084,8 @@ function connectWebSocket() {
                 updateAiReportUI(msg.report);
             } else if (msg.type === 'ADAPTIVE_PROFILE_UPDATED') {
                 updateAdaptiveProfileUI(msg.profile);
+            } else if (msg.type === 'MACRO_STATUS_UPDATED') {
+                updateMacroStatusUI(msg.macro_status);
             } else if (msg.type === 'BACKTEST_SAVED') {
                 fetchBacktestHistory();
             }

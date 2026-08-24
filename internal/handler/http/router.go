@@ -58,15 +58,19 @@ func SetupRouter(h *Handler, staticFS embed.FS) *gin.Engine {
 		api.POST("/ai/adaptive-trigger", h.TriggerAdaptiveTuning)
 		api.POST("/ai/optuna-tune", h.RunOptunaTuning)
 
-		// Backtest & Optimization Endpoints
+		// Macro & Fundamental Analysis Endpoints
+		api.GET("/macro/fundamental-status", h.GetMacroStatus)
+		api.POST("/macro/fundamental-status", h.UpdateMacroStatus)
+
+		// Quantitative Backtesting Endpoints
 		api.POST("/backtest/run", h.RunBacktest)
-		api.POST("/backtest/optimize", h.OptimizeBacktest)
 		api.GET("/backtest/history", h.GetBacktestHistory)
 		api.GET("/backtest/run/:id", h.GetBacktestRunDetail)
+		api.POST("/backtest/optimize", h.OptimizeBacktest)
 		api.GET("/backtest/export", h.ExportBacktestCSV)
 	}
 
-	// WebSocket endpoint
+	// WebSocket Route for Real-Time HUD updates
 	r.GET("/ws", h.wsHub.HandleWS)
 
 	return r

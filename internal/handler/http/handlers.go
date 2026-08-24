@@ -199,18 +199,20 @@ func (h *Handler) RunBacktest(c *gin.Context) {
 			tradeRecs := make([]domain.BacktestTradeRecord, 0, len(result.Trades))
 			for _, t := range result.Trades {
 				tradeRecs = append(tradeRecs, domain.BacktestTradeRecord{
-					RunID:      runID,
-					Ticket:     t.Ticket,
-					Action:     t.Action,
-					Lots:       t.Lots,
-					OpenPrice:  t.OpenPrice,
-					ClosePrice: t.ClosePrice,
-					OpenTime:   t.OpenTime,
-					CloseTime:  t.CloseTime,
-					Profit:     t.Profit,
-					Pips:       t.Pips,
-					Reason:     t.Reason,
-					Regime:     t.Regime,
+					RunID:       runID,
+					Ticket:      t.Ticket,
+					Action:      t.Action,
+					Lots:        t.Lots,
+					OpenPrice:   t.OpenPrice,
+					ClosePrice:  t.ClosePrice,
+					OpenTime:    t.OpenTime,
+					CloseTime:   t.CloseTime,
+					Profit:      t.Profit,
+					Pips:        t.Pips,
+					Reason:      t.Reason,
+					Regime:      t.Regime,
+					EntryReason: t.EntryReason,
+					MacroBias:   t.MacroBias,
 				})
 			}
 			_ = h.repo.SaveBacktestTrades(runID, tradeRecs)
@@ -335,24 +337,55 @@ func (h *Handler) GetBacktestRunDetail(c *gin.Context) {
 	})
 }
 
-// ExportBacktestCSV exports trade history of the last backtest run
+// ExportBacktestCSV exports trade history of a specific run or the last backtest run
 func (h *Handler) ExportBacktestCSV(c *gin.Context) {
-	h.resultMutex.RLock()
-	res := h.lastBacktestResult
-	h.resultMutex.RUnlock()
+	runIDStr := c.Query("run_id")
+	var tradeList []domain.BacktestTradeRecord
+	filename := "backtest_trades_latest.csv"
 
-	if res == nil || len(res.Trades) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No backtest results available to export. Please run backtest first."})
-		return
+	if runIDStr != "" {
+		runID, err := strconv.ParseInt(runIDStr, 10, 64)
+		if err == nil {
+			tradeList, _ = h.repo.GetBacktestTradesByRunID(runID)
+			filename = fmt.Sprintf("backtest_trades_run_%d.csv", runID)
+		}
 	}
 
-	c.Header("Content-Disposition", "attachment; filename=backtest_trades_1year.csv")
+	if len(tradeList) == 0 {
+		h.resultMutex.RLock()
+		res := h.lastBacktestResult
+		h.resultMutex.RUnlock()
+
+		if res == nil || len(res.Trades) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No backtest results available to export. Please run backtest first."})
+			return
+		}
+		for _, t := range res.Trades {
+			tradeList = append(tradeList, domain.BacktestTradeRecord{
+				Ticket:      t.Ticket,
+				Action:      t.Action,
+				Lots:        t.Lots,
+				OpenPrice:   t.OpenPrice,
+				ClosePrice:  t.ClosePrice,
+				OpenTime:    t.OpenTime,
+				CloseTime:   t.CloseTime,
+				Profit:      t.Profit,
+				Pips:        t.Pips,
+				Reason:      t.Reason,
+				Regime:      t.Regime,
+				EntryReason: t.EntryReason,
+				MacroBias:   t.MacroBias,
+			})
+		}
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 
 	writer := csv.NewWriter(c.Writer)
-	_ = writer.Write([]string{"Ticket", "Action", "Lots", "OpenPrice", "ClosePrice", "OpenTime", "CloseTime", "ProfitJPY", "Pips", "Reason", "Regime"})
+	_ = writer.Write([]string{"Ticket", "Action", "Lots", "OpenPrice", "ClosePrice", "OpenTime(JST)", "CloseTime(JST)", "ProfitJPY", "Pips", "ExitReason", "Regime", "EntryReason", "MacroBias"})
 
-	for _, t := range res.Trades {
+	for _, t := range tradeList {
 		_ = writer.Write([]string{
 			strconv.Itoa(t.Ticket),
 			t.Action,
@@ -365,6 +398,8 @@ func (h *Handler) ExportBacktestCSV(c *gin.Context) {
 			fmt.Sprintf("%.1f", t.Pips),
 			t.Reason,
 			t.Regime,
+			t.EntryReason,
+			t.MacroBias,
 		})
 	}
 	writer.Flush()
@@ -506,6 +541,39 @@ func (h *Handler) RunOptunaTuning(c *gin.Context) {
 		"message": "Python Optuna Bayesian Tuning completed & applied",
 		"output":  string(out),
 		"profile": profile,
+	})
+}
+
+// GetMacroStatus returns the latest macroeconomic, calendar & AI sentiment status.
+func (h *Handler) GetMacroStatus(c *gin.Context) {
+	status := h.adaptiveService.GetMacroStatus()
+	if status == nil {
+		c.JSON(http.StatusOK, gin.H{"status": "none"})
+		return
+	}
+	c.JSON(http.StatusOK, status)
+}
+
+// UpdateMacroStatus updates macroeconomic status from Python / external fundamental feeds.
+func (h *Handler) UpdateMacroStatus(c *gin.Context) {
+	var status domain.MacroFundamentalStatus
+	if err := c.ShouldBindJSON(&status); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid macro status format: " + err.Error()})
+		return
+	}
+
+	updated := h.adaptiveService.UpdateMacroStatus(&status)
+
+	// Broadcast updated macro status via WebSocket to live dashboard
+	h.wsHub.BroadcastJSON(gin.H{
+		"type":         "MACRO_STATUS_UPDATED",
+		"macro_status": updated,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":       "success",
+		"message":      "Macro fundamental status successfully updated",
+		"macro_status": updated,
 	})
 }
 

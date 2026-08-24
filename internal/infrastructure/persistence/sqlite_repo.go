@@ -121,6 +121,8 @@ func (r *SQLiteRepository) initTables() error {
 		pips REAL NOT NULL,
 		reason TEXT NOT NULL,
 		regime TEXT NOT NULL,
+		entry_reason TEXT NOT NULL DEFAULT '',
+		macro_bias TEXT NOT NULL DEFAULT '',
 		FOREIGN KEY(run_id) REFERENCES backtest_runs(id) ON DELETE CASCADE
 	);
 	CREATE INDEX IF NOT EXISTS idx_bt_trades_run ON backtest_trades (run_id);
@@ -140,8 +142,15 @@ func (r *SQLiteRepository) initTables() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_bt_opts_run ON backtest_optimizations (run_id);
 	`
-	_, err := r.db.Exec(schema)
-	return err
+	if _, err := r.db.Exec(schema); err != nil {
+		return err
+	}
+
+	// Schema migrations for existing databases
+	_, _ = r.db.Exec("ALTER TABLE backtest_trades ADD COLUMN entry_reason TEXT NOT NULL DEFAULT ''")
+	_, _ = r.db.Exec("ALTER TABLE backtest_trades ADD COLUMN macro_bias TEXT NOT NULL DEFAULT ''")
+
+	return nil
 }
 
 func (r *SQLiteRepository) GetAllTrades() ([]domain.TradeRecord, error) {
@@ -175,6 +184,9 @@ func (r *SQLiteRepository) GetAllTrades() ([]domain.TradeRecord, error) {
 		}
 		trades = append(trades, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return trades, nil
 }
 
@@ -200,6 +212,9 @@ func (r *SQLiteRepository) GetRecentSignals(limit int) ([]domain.Signal, error) 
 			return nil, err
 		}
 		signals = append(signals, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return signals, nil
 }
@@ -265,8 +280,9 @@ func (r *SQLiteRepository) SaveBacktestTrades(runID int64, trades []domain.Backt
 	stmt, err := tx.Prepare(`
 		INSERT INTO backtest_trades (
 			run_id, ticket, action, lots, open_price, close_price,
-			open_time, close_time, profit, pips, reason, regime
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			open_time, close_time, profit, pips, reason, regime,
+			entry_reason, macro_bias
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -277,6 +293,7 @@ func (r *SQLiteRepository) SaveBacktestTrades(runID int64, trades []domain.Backt
 		_, err := stmt.Exec(
 			runID, t.Ticket, t.Action, t.Lots, t.OpenPrice, t.ClosePrice,
 			t.OpenTime, t.CloseTime, t.Profit, t.Pips, t.Reason, t.Regime,
+			t.EntryReason, t.MacroBias,
 		)
 		if err != nil {
 			return err
@@ -344,6 +361,9 @@ func (r *SQLiteRepository) GetBacktestRuns(limit int) ([]domain.BacktestRunRecor
 		}
 		list = append(list, rec)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return list, nil
 }
 
@@ -372,7 +392,8 @@ func (r *SQLiteRepository) GetBacktestRunByID(id int64) (*domain.BacktestRunReco
 func (r *SQLiteRepository) GetBacktestTradesByRunID(runID int64) ([]domain.BacktestTradeRecord, error) {
 	rows, err := r.db.Query(`
 		SELECT id, run_id, ticket, action, lots, open_price, close_price,
-		       open_time, close_time, profit, pips, reason, regime
+		       open_time, close_time, profit, pips, reason, regime,
+		       entry_reason, macro_bias
 		FROM backtest_trades
 		WHERE run_id = ?
 		ORDER BY id ASC
@@ -388,10 +409,14 @@ func (r *SQLiteRepository) GetBacktestTradesByRunID(runID int64) ([]domain.Backt
 		if err := rows.Scan(
 			&t.ID, &t.RunID, &t.Ticket, &t.Action, &t.Lots, &t.OpenPrice, &t.ClosePrice,
 			&t.OpenTime, &t.CloseTime, &t.Profit, &t.Pips, &t.Reason, &t.Regime,
+			&t.EntryReason, &t.MacroBias,
 		); err != nil {
 			return nil, err
 		}
 		list = append(list, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return list, nil
 }

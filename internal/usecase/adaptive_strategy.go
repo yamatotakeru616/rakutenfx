@@ -9,11 +9,12 @@ import (
 	"time"
 )
 
-// AdaptiveStrategyService manages AI co-evolution and hyperparameter auto-tuning.
+// AdaptiveStrategyService manages AI co-evolution, macro analysis, and hyperparameter auto-tuning.
 type AdaptiveStrategyService struct {
-	aiClient       *ai.GeminiClient
-	currentProfile *domain.AdaptiveProfile
-	mu             sync.RWMutex
+	aiClient           *ai.GeminiClient
+	currentProfile     *domain.AdaptiveProfile
+	currentMacroStatus *domain.MacroFundamentalStatus
+	mu                 sync.RWMutex
 }
 
 func NewAdaptiveStrategyService(aiClient *ai.GeminiClient) *AdaptiveStrategyService {
@@ -34,10 +35,46 @@ func NewAdaptiveStrategyService(aiClient *ai.GeminiClient) *AdaptiveStrategyServ
 		AdaptedAt:            time.Now(),
 	}
 
-	return &AdaptiveStrategyService{
-		aiClient:       aiClient,
-		currentProfile: defaultProfile,
+	defaultMacro := &domain.MacroFundamentalStatus{
+		NextEventName:        "米CPI (消費者物価指数)",
+		NextEventTime:        time.Now().Add(2 * time.Hour),
+		MinutesToEvent:       120,
+		ImpactLevel:          "HIGH",
+		EventKillSwitchArmed: false,
+		US10YYield:           4.25,
+		JP10YYield:           0.85,
+		YieldSpread:          3.40,
+		MacroBias:            "BULLISH_USD",
+		GeminiSentimentScore: 0.65,
+		GeminiRationale:      "米金利高止まりと日銀緩和継続スタンスにより、マクロ的ドル高円安トレンド継続。押し目買い優位。",
+		UpdatedAt:            time.Now(),
 	}
+
+	return &AdaptiveStrategyService{
+		aiClient:           aiClient,
+		currentProfile:     defaultProfile,
+		currentMacroStatus: defaultMacro,
+	}
+}
+
+// GetMacroStatus returns the current macroeconomic & fundamental status.
+func (s *AdaptiveStrategyService) GetMacroStatus() *domain.MacroFundamentalStatus {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentMacroStatus
+}
+
+// UpdateMacroStatus updates the current macroeconomic & fundamental status.
+func (s *AdaptiveStrategyService) UpdateMacroStatus(status *domain.MacroFundamentalStatus) *domain.MacroFundamentalStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if status.UpdatedAt.IsZero() {
+		status.UpdatedAt = time.Now()
+	}
+	s.currentMacroStatus = status
+	log.Printf("[AdaptiveStrategy] 🌍 Macro Status Updated: NextEvent='%s', Armed=%v, Spread=%.2f%%, Bias='%s', GeminiScore=%.2f",
+		status.NextEventName, status.EventKillSwitchArmed, status.YieldSpread, status.MacroBias, status.GeminiSentimentScore)
+	return s.currentMacroStatus
 }
 
 // GetCurrentProfile returns the latest adapted hyperparameter profile.

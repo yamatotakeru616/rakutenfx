@@ -158,6 +158,37 @@
                         </div>
                     </div>
 
+                    <!-- Macro & Economic Calendar Panel -->
+                    <div class="macro-panel" id="macro-panel">
+                        <div class="macro-header">
+                            <span class="macro-title">🌍 MACRO &amp; ECONOMIC CALENDAR (ファンダメンタルズ)</span>
+                            <span id="macro-kill-badge" class="macro-badge standby">🟢 STANDBY (取引許可)</span>
+                        </div>
+                        <div class="macro-grid">
+                            <div>
+                                <span class="macro-label">次回重要指標:</span>
+                                <strong id="macro-next-event" class="macro-val-event">🇺🇸 米CPI (消費者物価指数)</strong>
+                            </div>
+                            <div>
+                                <span class="macro-label">指標発表まで:</span>
+                                <strong id="macro-countdown" class="macro-val-countdown">残り 120 分</strong>
+                            </div>
+                            <div>
+                                <span class="macro-label">日米10年債金利差:</span>
+                                <strong id="macro-spread" class="macro-val-spread">3.40% (US 4.28% / JP 0.88%)</strong>
+                            </div>
+                            <div>
+                                <span class="macro-label">マクロ方向性:</span>
+                                <strong id="macro-bias" class="macro-val-bias">📈 BULLISH_USD (ドル買い優勢)</strong>
+                            </div>
+                        </div>
+                        <div class="macro-ai-box">
+                            <span class="macro-label">Gemini 2.5 Flash センチメント: </span>
+                            <span id="macro-gemini-score" class="macro-score-badge">+0.65 (タカ派)</span>
+                            <span id="macro-rationale" class="macro-rationale-text">米金利高止まりと日銀緩和スタンスにより、構造的な押し目買い需要が継続中。</span>
+                        </div>
+                    </div>
+
                     <!-- AI Co-Evolution Market Habit Karte -->
                     <div class="ai-karte-panel" id="ai-karte-panel">
                         <div class="ai-karte-header">
@@ -308,8 +339,14 @@
                         <input type="range" id="param-rr-ratio" min="1.0" max="3.0" step="0.2" value="2.0" oninput="document.getElementById('val-rr-ratio').textContent='1 : '+parseFloat(this.value).toFixed(1)">
                     </div>
                     <div class="param-item">
-                        <label for="param-sl-pips">StopLoss / TakeProfit: <span id="val-sl-pips">10p / 20p</span></label>
-                        <input type="range" id="param-sl-pips" min="5" max="25" step="1" value="10" oninput="document.getElementById('val-sl-pips').textContent=this.value+'p / '+(this.value*parseFloat(document.getElementById('param-rr-ratio').value))+'p'">
+                        <label for="param-sl-pips">StopLoss / TakeProfit: <span id="val-sl-pips">7.5p / 15.8p</span></label>
+                        <input type="range" id="param-sl-pips" min="4" max="20" step="0.5" value="7.5" oninput="document.getElementById('val-sl-pips').textContent=this.value+'p / '+(this.value*parseFloat(document.getElementById('param-rr-ratio').value)).toFixed(1)+'p'">
+                    </div>
+                    <div class="param-item param-item-checkbox">
+                        <label class="checkbox-label" for="param-macro-filter">
+                            <input type="checkbox" id="param-macro-filter" checked>
+                            <span>🌍 ファンダメンタルズ＆経済指標フィルター (指標回避＆金利差バイアス)</span>
+                        </label>
                     </div>
                 </div>
             </section>
@@ -489,22 +526,41 @@
             <!-- Detailed Selected Backtest Trades Ledger -->
             <section class="trades-ledger glass-panel" id="section-bt-trades-ledger">
                 <div class="panel-header">
-                    <h2>📑 SELECTED BACKTEST TRADES LEDGER (全約定明細ログ)</h2>
-                    <span class="record-counter" id="bt-trades-counter">Runを選択すると約定明細が表示されます</span>
+                    <h2>📑 SELECTED BACKTEST TRADES LEDGER (全約定明細 ＆ エントリー根拠DBログ)</h2>
+                    <div class="header-btn-group">
+                        <button type="button" class="small-btn" id="btn-export-current-csv" onclick="exportBacktestCsv()">📥 CSV出力 (全明細)</button>
+                        <span class="record-counter" id="bt-trades-counter">Runを選択すると約定明細が表示されます</span>
+                    </div>
                 </div>
-                <div class="table-wrapper scrollable-trades-wrapper" style="max-height: 400px; overflow-y: auto;">
+
+                <!-- Interactive Multi-Filter Toolbar -->
+                <div class="trades-filter-toolbar">
+                    <div class="filter-pill-group">
+                        <button type="button" class="filter-pill active" id="filter-btn-all" onclick="setTradesFilter('ALL')">すべて (All)</button>
+                        <button type="button" class="filter-pill pill-win" id="filter-btn-wins" onclick="setTradesFilter('WINS')">🟢 勝ちトレード</button>
+                        <button type="button" class="filter-pill pill-loss" id="filter-btn-losses" onclick="setTradesFilter('LOSSES')">🔴 負けトレード</button>
+                        <button type="button" class="filter-pill pill-buy" id="filter-btn-buy" onclick="setTradesFilter('BUY')">📈 BUY</button>
+                        <button type="button" class="filter-pill pill-sell" id="filter-btn-sell" onclick="setTradesFilter('SELL')">📉 SELL</button>
+                    </div>
+                    <div class="filter-search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="input-bt-trade-search" class="hud-search-input" placeholder="根拠や日時で絞り込み (例: FR 50%, CPI, 2026-07)..." oninput="onTradeSearchInput(this.value)">
+                    </div>
+                </div>
+
+                <div class="table-wrapper scrollable-trades-wrapper" style="max-height: 480px; overflow-y: auto;">
                     <table class="hud-table">
                         <thead>
                             <tr>
                                 <th scope="col">Ticket</th>
                                 <th scope="col">Action</th>
                                 <th scope="col">Lots</th>
-                                <th scope="col">Open Price</th>
-                                <th scope="col">Close Price</th>
-                                <th scope="col">Open Time</th>
-                                <th scope="col">Close Time</th>
-                                <th scope="col">Profit (JPY)</th>
+                                <th scope="col">エントリー日時 (JST)</th>
+                                <th scope="col">決済日時 (JST)</th>
+                                <th scope="col">エントリー根拠 (Technical + Macro)</th>
+                                <th scope="col">Open / Close</th>
                                 <th scope="col">Pips</th>
+                                <th scope="col">Profit (JPY)</th>
                                 <th scope="col">Exit Reason</th>
                                 <th scope="col">Regime</th>
                             </tr>

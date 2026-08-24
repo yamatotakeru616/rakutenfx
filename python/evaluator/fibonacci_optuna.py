@@ -106,6 +106,7 @@ class FibonacciQuantOptimizer:
             "dow_lookback": dow_lb,
             "enable_break_even": False,
             "enable_fib_filter": True,
+            "enable_macro_filter": True,
         }
 
         result = self.evaluate_parameters(payload)
