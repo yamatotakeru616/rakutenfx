@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os/exec"
 	"rakutenfx/internal/domain"
 	"rakutenfx/internal/infrastructure/ai"
 	"rakutenfx/internal/infrastructure/backtest"
@@ -462,4 +463,51 @@ func (h *Handler) TriggerAdaptiveTuning(c *gin.Context) {
 		"profile": profile,
 	})
 }
+
+// UpdateAdaptiveProfile receives external optimization results (e.g. from Python Optuna) and applies them.
+func (h *Handler) UpdateAdaptiveProfile(c *gin.Context) {
+	var profile domain.AdaptiveProfile
+	if err := c.ShouldBindJSON(&profile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid profile format: " + err.Error()})
+		return
+	}
+
+	updated := h.adaptiveService.ApplyProfile(&profile)
+
+	// Broadcast updated profile via WebSocket to live dashboard
+	h.wsHub.BroadcastJSON(gin.H{
+		"type":    "ADAPTIVE_PROFILE_UPDATED",
+		"profile": updated,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Adaptive profile successfully applied to Go server",
+		"profile": updated,
+	})
+}
+
+// RunOptunaTuning executes Python Optuna Bayesian Optimization process and applies best parameters.
+func (h *Handler) RunOptunaTuning(c *gin.Context) {
+	trialsStr := c.DefaultQuery("trials", "20")
+	cmd := exec.Command("python", "python/evaluator/optuna_tuner.py", "--trials", trialsStr, "--apply")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "Optuna execution failed: " + err.Error(),
+			"output": string(out),
+		})
+		return
+	}
+
+	profile := h.adaptiveService.GetCurrentProfile()
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Python Optuna Bayesian Tuning completed & applied",
+		"output":  string(out),
+		"profile": profile,
+	})
+}
+
+
 

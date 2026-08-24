@@ -146,6 +146,9 @@
                     <div class="panel-header">
                         <h2>🤖 GEMINI AI CO-EVOLUTION &amp; QUANT ANALYST</h2>
                         <div class="header-btn-group">
+                            <button type="button" class="ai-eval-btn ai-optuna-btn" id="btn-run-optuna" onclick="runOptunaTuning()">
+                                🐍 Python Optuna 最適化
+                            </button>
                             <button type="button" class="ai-eval-btn ai-adapt-btn" id="ai-adapt-btn" onclick="triggerAiAdaptation()">
                                 ⚡ 即時AI適応を実行
                             </button>
@@ -478,6 +481,40 @@
                         </thead>
                         <tbody id="bt-history-table-body">
                             <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Detailed Selected Backtest Trades Ledger -->
+            <section class="trades-ledger glass-panel" id="section-bt-trades-ledger">
+                <div class="panel-header">
+                    <h2>📑 SELECTED BACKTEST TRADES LEDGER (全約定明細ログ)</h2>
+                    <span class="record-counter" id="bt-trades-counter">Runを選択すると約定明細が表示されます</span>
+                </div>
+                <div class="table-wrapper scrollable-trades-wrapper" style="max-height: 400px; overflow-y: auto;">
+                    <table class="hud-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Ticket</th>
+                                <th scope="col">Action</th>
+                                <th scope="col">Lots</th>
+                                <th scope="col">Open Price</th>
+                                <th scope="col">Close Price</th>
+                                <th scope="col">Open Time</th>
+                                <th scope="col">Close Time</th>
+                                <th scope="col">Profit (JPY)</th>
+                                <th scope="col">Pips</th>
+                                <th scope="col">Exit Reason</th>
+                                <th scope="col">Regime</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bt-trades-table-body">
+                            <tr>
+                                <td colspan="11" class="table-placeholder-cell">
+                                    上の「PAST BACKTEST RUNS」から行をクリックするか、「1年バックテスト実行」を押すと約定明細が展開されます
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

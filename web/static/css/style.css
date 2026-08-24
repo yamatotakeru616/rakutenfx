@@ -818,6 +818,51 @@ body {
     border-left: 3px solid var(--accent-cyan);
 }
 
+/* Exit Reason Badges */
+.badge-tp {
+    background: rgba(0, 255, 136, 0.15) !important;
+    color: var(--accent-green) !important;
+    border: 1px solid rgba(0, 255, 136, 0.3) !important;
+}
+
+.badge-sl {
+    background: rgba(255, 51, 68, 0.15) !important;
+    color: var(--accent-red) !important;
+    border: 1px solid rgba(255, 51, 68, 0.3) !important;
+}
+
+.badge-timeout {
+    background: rgba(255, 170, 0, 0.15) !important;
+    color: var(--accent-gold) !important;
+    border: 1px solid rgba(255, 170, 0, 0.3) !important;
+}
+
+.badge-reverse {
+    background: rgba(0, 240, 255, 0.15) !important;
+    color: var(--accent-cyan) !important;
+    border: 1px solid rgba(0, 240, 255, 0.3) !important;
+}
+
+/* AI Action Buttons */
+.header-btn-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.ai-optuna-btn {
+    background: linear-gradient(135deg, rgba(0, 150, 255, 0.25), rgba(255, 215, 0, 0.25)) !important;
+    border: 1px solid rgba(0, 240, 255, 0.5) !important;
+    color: #f0f4f8 !important;
+    font-weight: 700;
+}
+
+.ai-optuna-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 150, 255, 0.45), rgba(255, 215, 0, 0.45)) !important;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+    transform: translateY(-1px);
+}
+
 /* Footer */
 .hud-footer {
     display: flex;

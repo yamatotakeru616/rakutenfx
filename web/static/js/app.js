@@ -267,6 +267,9 @@ async function runOneYearBacktest() {
         const data = await res.json();
         if (data.run_id) currentViewingRunId = data.run_id;
         updateBacktestUI(data.result, data.ai_report);
+        if (data.result && data.result.trades) {
+            renderBacktestTradesTable(data.result.trades, data.run_id);
+        }
         fetchBacktestHistory();
     } catch (err) {
         alert('バックテスト実行エラー: ' + err.message);
@@ -281,16 +284,30 @@ function updateBacktestUI(r, ai) {
     if (!r) return;
 
     document.getElementById('bt-kpi-profit').textContent = `${r.total_profit >= 0 ? '+' : ''}¥${r.total_profit.toLocaleString()}`;
-    document.getElementById('bt-kpi-gross-profit').textContent = `¥${r.gross_profit.toLocaleString()}`;
-    document.getElementById('bt-kpi-gross-loss').textContent = `¥${r.gross_loss.toLocaleString()}`;
+    if (document.getElementById('bt-kpi-gross-profit')) {
+        document.getElementById('bt-kpi-gross-profit').textContent = `¥${(r.gross_profit || 0).toLocaleString()}`;
+    }
+    if (document.getElementById('bt-kpi-gross-loss')) {
+        document.getElementById('bt-kpi-gross-loss').textContent = `¥${(r.gross_loss || 0).toLocaleString()}`;
+    }
 
     document.getElementById('bt-kpi-win-rate').textContent = `${r.win_rate.toFixed(1)}%`;
-    document.getElementById('bt-kpi-trades-count').textContent = `${r.total_trades}戦 ${r.winning_trades}勝 ${r.losing_trades}敗`;
-    document.getElementById('bt-kpi-avg-profit').textContent = `¥${r.average_profit.toLocaleString()}`;
+    const winTrades = r.winning_trades || 0;
+    const lossTrades = r.losing_trades || 0;
+    const tradesText = (winTrades > 0 || lossTrades > 0) ? `${r.total_trades}戦 ${winTrades}勝 ${lossTrades}敗` : `${r.total_trades}戦`;
+    document.getElementById('bt-kpi-trades-count').textContent = tradesText;
+    
+    if (document.getElementById('bt-kpi-avg-profit')) {
+        document.getElementById('bt-kpi-avg-profit').textContent = `¥${(r.average_profit || 0).toLocaleString()}`;
+    }
 
     document.getElementById('bt-kpi-pf').textContent = r.profit_factor.toFixed(2);
-    document.getElementById('bt-kpi-largest-win').textContent = `+¥${r.largest_win.toLocaleString()}`;
-    document.getElementById('bt-kpi-largest-loss').textContent = `-¥${Math.abs(r.largest_loss).toLocaleString()}`;
+    if (document.getElementById('bt-kpi-largest-win')) {
+        document.getElementById('bt-kpi-largest-win').textContent = `+¥${(r.largest_win || 0).toLocaleString()}`;
+    }
+    if (document.getElementById('bt-kpi-largest-loss')) {
+        document.getElementById('bt-kpi-largest-loss').textContent = `-¥${Math.abs(r.largest_loss || 0).toLocaleString()}`;
+    }
 
     document.getElementById('bt-kpi-max-dd').textContent = `¥${r.max_drawdown.toLocaleString()} (${r.max_drawdown_pct.toFixed(1)}%)`;
 
@@ -315,20 +332,35 @@ function updateBacktestUI(r, ai) {
     }
 
     // Update Gemini AI Audit
-    if (ai) {
-        document.getElementById('bt-ai-rank').textContent = ai.overall_rank || 'S';
-        document.getElementById('bt-ai-title').textContent = ai.title || 'AI Backtest Audit';
-        document.getElementById('bt-ai-summary').textContent = ai.summary || '';
+    updateBacktestAiUI(ai);
+}
 
-        const strengthsList = document.getElementById('bt-ai-strengths');
+// Update Gemini AI Audit Panel in Backtest Tab
+function updateBacktestAiUI(ai) {
+    if (!ai) return;
+
+    if (document.getElementById('bt-ai-rank')) {
+        document.getElementById('bt-ai-rank').textContent = ai.overall_rank || 'S';
+    }
+    if (document.getElementById('bt-ai-title')) {
+        document.getElementById('bt-ai-title').textContent = ai.title || 'AI Backtest Audit';
+    }
+    if (document.getElementById('bt-ai-summary')) {
+        document.getElementById('bt-ai-summary').textContent = ai.summary || '';
+    }
+
+    const strengthsList = document.getElementById('bt-ai-strengths');
+    if (strengthsList) {
         strengthsList.innerHTML = '';
         (ai.strengths || []).forEach(s => {
             const li = document.createElement('li');
             li.textContent = s;
             strengthsList.appendChild(li);
         });
+    }
 
-        const weaknessesList = document.getElementById('bt-ai-weaknesses');
+    const weaknessesList = document.getElementById('bt-ai-weaknesses');
+    if (weaknessesList) {
         weaknessesList.innerHTML = '';
         (ai.action_points || ai.weaknesses || []).forEach(w => {
             const li = document.createElement('li');
@@ -336,6 +368,67 @@ function updateBacktestUI(r, ai) {
             weaknessesList.appendChild(li);
         });
     }
+}
+
+// Render Selected Backtest Detailed Trades Table
+function renderBacktestTradesTable(trades, runId) {
+    const tbody = document.getElementById('bt-trades-table-body');
+    const counter = document.getElementById('bt-trades-counter');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (!trades || trades.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="table-placeholder-cell">約定明細データはありません</td></tr>';
+        if (counter) counter.textContent = runId ? `Run #${runId}: 0 trades` : '0 trades';
+        return;
+    }
+
+    if (counter) {
+        counter.textContent = runId ? `Showing ${trades.length} trades for Run #${runId}` : `Showing ${trades.length} trades`;
+    }
+
+    // Render up to 500 trades efficiently
+    const renderTrades = trades.slice(0, 500);
+    renderTrades.forEach(t => {
+        const tr = document.createElement('tr');
+        const profitClass = t.profit >= 0 ? 'profit-pos' : 'profit-neg';
+        const profitPrefix = t.profit >= 0 ? '+' : '';
+        const pipsPrefix = t.pips >= 0 ? '+' : '';
+        
+        let reasonBadge = t.reason || '-';
+        if (t.reason === 'TP_HIT') {
+            reasonBadge = '<span class="regime-badge badge-tp">🎯 TP HIT</span>';
+        } else if (t.reason === 'SL_HIT') {
+            reasonBadge = '<span class="regime-badge badge-sl">🛑 SL HIT</span>';
+        } else if (t.reason === 'TIMEOUT_EXIT') {
+            reasonBadge = '<span class="regime-badge badge-timeout">⏱️ TIMEOUT</span>';
+        } else if (t.reason === 'REVERSE_CLOSE') {
+            reasonBadge = '<span class="regime-badge badge-reverse">🔄 REVERSE</span>';
+        }
+
+        const openDate = t.open_time ? t.open_time.split('.')[0].replace('T', ' ') : '-';
+        const closeDate = t.close_time ? t.close_time.split('.')[0].replace('T', ' ') : '-';
+        const lotsVal = t.lots ? t.lots.toFixed(2) : '0.20';
+        const openP = t.open_price ? t.open_price.toFixed(3) : '-';
+        const closeP = t.close_price ? t.close_price.toFixed(3) : '-';
+        const pipsVal = t.pips ? t.pips.toFixed(1) : '0.0';
+
+        tr.innerHTML = `
+            <td>#${t.ticket || t.id}</td>
+            <td><span class="action-tag ${t.action.toLowerCase()}">${t.action}</span></td>
+            <td>${lotsVal} L</td>
+            <td>${openP}</td>
+            <td>${closeP}</td>
+            <td style="font-size: 11px; color: var(--text-muted);">${openDate}</td>
+            <td style="font-size: 11px; color: var(--text-muted);">${closeDate}</td>
+            <td class="${profitClass}"><strong>${profitPrefix}¥${Math.round(t.profit).toLocaleString()}</strong></td>
+            <td class="${profitClass}">${pipsPrefix}${pipsVal}p</td>
+            <td>${reasonBadge}</td>
+            <td><span class="regime-badge ${getRegimeBadgeClass(t.regime)}">${t.regime || 'CLEAR'}</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 // Run Parallel Grid Search Optimization
@@ -507,7 +600,12 @@ async function loadBacktestRunDetail(runId) {
             updateBacktestAiUI(data.ai_report);
         }
 
-        // Re-render history table to highlight selected row
+        // Render detailed trades ledger for this run
+        if (data.trades) {
+            renderBacktestTradesTable(data.trades, r.id);
+        }
+
+        // Update history table highlight
         fetchBacktestHistory();
     } catch (err) {
         alert('過去検証復元エラー: ' + err.message);
@@ -799,6 +897,35 @@ async function triggerAiAdaptation() {
     } finally {
         btn.disabled = false;
         btn.textContent = '⚡ 即時AI適応を実行';
+    }
+}
+
+// Run Python Optuna Bayesian Tuning Pipeline
+async function runOptunaTuning() {
+    const btn = document.getElementById('btn-run-optuna');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Optuna ベイズ探索中...';
+    }
+
+    try {
+        const res = await fetch('/api/ai/optuna-tune?trials=20', { method: 'POST' });
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Optuna execution failed');
+        }
+        const data = await res.json();
+        if (data.profile) {
+            updateAdaptiveProfileUI(data.profile);
+        }
+        alert('🐍 Python Optuna 最適化完了!\n最良ハイパーパラメータを Go サーバーへ自動適用しました。');
+    } catch (err) {
+        alert('Optuna 最適化エラー: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🐍 Python Optuna 最適化';
+        }
     }
 }
 

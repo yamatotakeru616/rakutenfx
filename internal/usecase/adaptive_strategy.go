@@ -82,3 +82,19 @@ func (s *AdaptiveStrategyService) AdaptMarketHabit(
 
 	return profile, nil
 }
+
+// ApplyProfile allows external optimizers (e.g., Python Optuna) to directly inject optimal profiles.
+func (s *AdaptiveStrategyService) ApplyProfile(profile *domain.AdaptiveProfile) *domain.AdaptiveProfile {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if profile.AdaptedAt.IsZero() {
+		profile.AdaptedAt = time.Now()
+	}
+	s.currentProfile = profile
+	log.Printf("[AdaptiveStrategy] ⚡ External Profile Applied (Optuna/ML): Habit='%s', Score=%d, BB=%.1fσ, RSI=%.0f/%.0f, ADX=%.0f, Timeout=%dm",
+		profile.MarketHabit, profile.EdgeHealthScore, profile.RecommendedBBStd, profile.RecommendedRSIOS, profile.RecommendedRSIOB, profile.RecommendedADX, profile.RecommendedTimeout)
+
+	return s.currentProfile
+}
+

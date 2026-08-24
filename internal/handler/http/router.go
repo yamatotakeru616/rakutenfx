@@ -54,7 +54,9 @@ func SetupRouter(h *Handler, staticFS embed.FS) *gin.Engine {
 
 		// AI Co-Evolution & Adaptive Tuning Endpoints
 		api.GET("/ai/adaptive-profile", h.GetAdaptiveProfile)
+		api.POST("/ai/adaptive-profile", h.UpdateAdaptiveProfile)
 		api.POST("/ai/adaptive-trigger", h.TriggerAdaptiveTuning)
+		api.POST("/ai/optuna-tune", h.RunOptunaTuning)
 
 		// Backtest & Optimization Endpoints
 		api.POST("/backtest/run", h.RunBacktest)
