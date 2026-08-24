@@ -29,6 +29,11 @@ artifacts/trades/*.png
 python/artifacts/
 *.bak.*
 
+# Go
+*.exe
+rakutenfx
+rakutenfx.exe
+
 # OS / Editor
 .DS_Store
 Thumbs.db

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rakuten FX Pro Trader Cockpit - Go Native AI Engine</title>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="cockpit-container">
+        <!-- Top Navigation Bar -->
+        <header class="hud-header">
+            <div class="hud-brand">
+                <div class="hud-logo-icon">⚡</div>
+                <div class="brand-text">
+                    <span class="brand-title">RAKUTEN FX QUANT COCKPIT</span>
+                    <span class="brand-subtitle">GO SINGLE BINARY // RUST GATEWAY PIPELINE</span>
+                </div>
+            </div>
+
+            <div class="hud-status-panel">
+                <div class="status-badge" id="system-status-badge">
+                    <span class="pulse-dot"></span>
+                    <span id="system-status-text">GO SERVER: ONLINE</span>
+                </div>
+                <div class="status-badge gateway-badge">
+                    <span class="pulse-dot green"></span>
+                    <span>GATEWAY: PORT 5555</span>
+                </div>
+                <div class="status-badge killswitch-badge" id="hud-killswitch-status">
+                    <span>KILL-SWITCH: NORMAL</span>
+                </div>
+                <button class="kill-switch-btn" id="kill-switch-btn" onclick="toggleKillSwitch()">
+                    🚨 EMERGENCY KILL
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI Metrics Ribbon -->
+        <section class="kpi-grid">
+            <div class="kpi-card glow-cyan">
+                <div class="kpi-header">
+                    <span class="kpi-title">NET PROFIT (総損益)</span>
+                    <span class="kpi-icon">💰</span>
+                </div>
+                <div class="kpi-value highlight-green" id="kpi-total-profit">+¥0</div>
+                <div class="kpi-meta">
+                    <span>総利益: <strong id="kpi-gross-profit">¥0</strong></span>
+                    <span>総損失: <strong id="kpi-gross-loss">¥0</strong></span>
+                </div>
+            </div>
+
+            <div class="kpi-card glow-magenta">
+                <div class="kpi-header">
+                    <span class="kpi-title">WIN RATE (勝率)</span>
+                    <span class="kpi-icon">🎯</span>
+                </div>
+                <div class="kpi-value highlight-cyan" id="kpi-win-rate">0.0%</div>
+                <div class="kpi-meta">
+                    <span id="kpi-trades-count">0戦 0勝 0敗</span>
+                    <span>連勝: <strong id="kpi-consecutive-wins">0</strong></span>
+                </div>
+            </div>
+
+            <div class="kpi-card glow-gold">
+                <div class="kpi-header">
+                    <span class="kpi-title">PROFIT FACTOR (PF)</span>
+                    <span class="kpi-icon">📈</span>
+                </div>
+                <div class="kpi-value highlight-gold" id="kpi-profit-factor">0.00</div>
+                <div class="kpi-meta">
+                    <span>平均利益: <strong id="kpi-avg-profit">¥0</strong></span>
+                    <span>最大勝: <strong id="kpi-largest-win">¥0</strong></span>
+                </div>
+            </div>
+
+            <div class="kpi-card glow-orange">
+                <div class="kpi-header">
+                    <span class="kpi-title">MAX DRAWDOWN</span>
+                    <span class="kpi-icon">🛡️</span>
+                </div>
+                <div class="kpi-value highlight-orange" id="kpi-max-drawdown">¥0 (0.0%)</div>
+                <div class="kpi-meta">
+                    <span>推奨ロット: <strong id="kpi-recommended-lot" class="lot-pill">0.25 Lot</strong></span>
+                    <span>最大敗: <strong id="kpi-largest-loss">¥0</strong></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Dashboard Split Grid -->
+        <main class="dashboard-main-grid">
+            <!-- Left: Equity Curve Chart & Signals -->
+            <section class="chart-section glass-panel">
+                <div class="panel-header">
+                    <h2>📈 EQUITY CURVE & PERFORMANCE ACCUMULATION</h2>
+                    <span class="refresh-indicator" id="chart-refresh-status">Real-time sync</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="equityChart"></canvas>
+                </div>
+
+                <!-- Strategy Rules & Signals Subpanel -->
+                <div class="signals-subpanel">
+                    <div class="panel-header">
+                        <h3>⚡ REAL-TIME STRATEGY SIGNALS & DOW CUT (4.0 Pips)</h3>
+                        <button class="small-btn" onclick="fetchSignals()">Refresh</button>
+                    </div>
+                    <div class="signals-list" id="signals-list">
+                        <!-- Signals rendered by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: Gemini AI Chief Analyst & Reflection -->
+            <section class="ai-analyst-section glass-panel">
+                <div class="panel-header">
+                    <h2>🤖 GEMINI AI QUANT CHIEF ANALYST</h2>
+                    <button class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
+                        ✨ RUN AI DIAGNOSIS
+                    </button>
+                </div>
+
+                <div class="ai-report-body" id="ai-report-body">
+                    <div class="ai-rank-card">
+                        <div class="rank-circle" id="ai-overall-rank">S</div>
+                        <div class="rank-details">
+                            <h4 id="ai-report-title">AI Performance Review Engine Ready</h4>
+                            <p id="ai-report-summary">ボタンをクリックすると、Gemini APIが直近のトレード履歴・4.0pips損切り・フィボナッチ押し目を総合評価し、改善提案を出力します。</p>
+                        </div>
+                    </div>
+
+                    <div class="ai-points-container">
+                        <div class="point-box strengths">
+                            <h4>✅ 検出された強み (Strengths)</h4>
+                            <ul id="ai-strengths-list">
+                                <li>4.0pips極小損切りルールの徹底執行</li>
+                                <li>上位足フィボナッチ（61.8%）反発のエッジ活用</li>
+                            </ul>
+                        </div>
+
+                        <div class="point-box weaknesses">
+                            <h4>⚠️ 改善課題 & アクションプラン (Action Plan)</h4>
+                            <ul id="ai-weaknesses-list">
+                                <li>ロンドンオープン直後のボラティリティ急変への警戒</li>
+                                <li>推奨ロット 0.25 Lot を厳守し資金管理を維持</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="ai-raw-text-container">
+                        <h4>📝 詳細講評・クオンツメモ</h4>
+                        <pre id="ai-raw-report">AI診断を実行すると詳細なプロアナリスト講評がここに表示されます...</pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom: Closed Trades Ledger -->
+        <section class="trades-ledger glass-panel">
+            <div class="panel-header">
+                <h2>📑 CLOSED TRADES LEDGER (SQLite WAL Data)</h2>
+                <span class="record-counter" id="trades-counter">Showing 0 trades</span>
+            </div>
+            <div class="table-wrapper">
+                <table class="hud-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Symbol</th>
+                            <th>Action</th>
+                            <th>Lots</th>
+                            <th>Open Price</th>
+                            <th>Close Price</th>
+                            <th>Open Time</th>
+                            <th>Close Time</th>
+                            <th>Profit</th>
+                            <th>Strategy Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trades-table-body">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="hud-footer">
+            <span>RAKUTEN FX QUANT COCKPIT v2.0 // GO SINGLE BINARY (modernc.org/sqlite)</span>
+            <span>TCP PORT: 5555 (Rust) / 5556 (Go IPC) / 8080 (REST + WS)</span>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

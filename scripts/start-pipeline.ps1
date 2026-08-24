@@ -1,77 +1,79 @@
-# MT4 Trading Pipeline Automated Runner & Verification Script
 param (
-    [bool]$Emulate = $true,
+    [switch]$Emulate,
     [int]$Ticks = 150,
     [string]$WebhookUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
-$env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\cargo-target"
 
 Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host ">>> Starting MT4 Trading & Evaluation Pipeline" -ForegroundColor Cyan
+Write-Host ">>> Starting MT4 Trading & Go Evaluation Pipeline" -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 
-# 1. Build Rust Gateway
-Write-Host "`n[1/4] Building Rust Gateway..." -ForegroundColor Yellow
-cargo build --bin gateway --quiet
-
-$GatewayExe = "$env:CARGO_TARGET_DIR\debug\gateway.exe"
-if (-not (Test-Path $GatewayExe)) {
-    Write-Error "Gateway executable not found at $GatewayExe"
+# 1. Check or Build Rust Gateway & Go Server
+Write-Host "`n[1/4] Checking Binaries..." -ForegroundColor Yellow
+if (-not (Test-Path "target/debug/gateway.exe")) {
+    cargo build --bin gateway --quiet
+}
+if (-not (Test-Path "rakutenfx.exe")) {
+    go build -ldflags="-s -w" -o rakutenfx.exe ./cmd/server
 }
 
-# 2. Check and Start Gateway Server if needed
-$AlreadyRunning = $false
+# 2. Check and Start Go Server (Port 8080 & 5556)
+$GoServerRunning = $false
 try {
-    $conn = Test-NetConnection -ComputerName "127.0.0.1" -Port 5555 -WarningAction SilentlyContinue -InformationLevel Quiet
+    $conn = Test-NetConnection -ComputerName "127.0.0.1" -Port 8080 -WarningAction SilentlyContinue -InformationLevel Quiet
     if ($conn) {
-        $AlreadyRunning = $true
-        Write-Host "`n[2/4] Rust Gateway is already running on 127.0.0.1:5555. Reusing existing instance." -ForegroundColor Green
+        $GoServerRunning = $true
+        Write-Host "`n[2/4] Go Server is already running on http://localhost:8080. Reusing existing instance." -ForegroundColor Green
     }
 } catch {}
 
-$ServerProcess = $null
-if (-not $AlreadyRunning) {
-    Write-Host "`n[2/4] Starting Rust Gateway Server (127.0.0.1:5555)..." -ForegroundColor Yellow
-    $ServerProcess = Start-Process -FilePath $GatewayExe -ArgumentList "serve --bind 127.0.0.1:5555 --db trade_pipeline.db" -PassThru -NoNewWindow
+$GoProcess = $null
+if (-not $GoServerRunning) {
+    Write-Host "`n[2/4] Starting Go Server (rakutenfx.exe)..." -ForegroundColor Yellow
+    $GoProcess = Start-Process -FilePath ".\rakutenfx.exe" -PassThru -NoNewWindow
+    Start-Sleep -Seconds 2
+}
+
+# 3. Check and Start Gateway Server (Port 5555)
+$GatewayRunning = $false
+try {
+    $conn = Test-NetConnection -ComputerName "127.0.0.1" -Port 5555 -WarningAction SilentlyContinue -InformationLevel Quiet
+    if ($conn) {
+        $GatewayRunning = $true
+        Write-Host "`n[3/4] Rust Gateway is already running on 127.0.0.1:5555. Reusing existing instance." -ForegroundColor Green
+    }
+} catch {}
+
+$GatewayProcess = $null
+if (-not $GatewayRunning) {
+    Write-Host "`n[3/4] Starting Rust Gateway Server (target\debug\gateway.exe)..." -ForegroundColor Yellow
+    $GatewayProcess = Start-Process -FilePath ".\target\debug\gateway.exe" -ArgumentList "serve" -PassThru -NoNewWindow
     Start-Sleep -Seconds 2
 }
 
 try {
-    # 3. Run Emulator if requested
+    # 4. Run Virtual Emulator if requested
     if ($Emulate) {
-        Write-Host "`n[3/4] Running MT4 Virtual Emulator ($Ticks ticks)..." -ForegroundColor Yellow
-        & $GatewayExe emulate --symbol "USDJPY" --base-price 155.20 --ticks $Ticks --interval-ms 30
+        Write-Host "`n[4/4] Running MT4 Virtual Emulator ($Ticks ticks)..." -ForegroundColor Yellow
+        & ".\target\debug\gateway.exe" emulate --symbol "USDJPY" --base-price 158.60 --ticks $Ticks --interval-ms 30
         Start-Sleep -Seconds 1
-    } else {
-        Write-Host "`n[3/4] Waiting for MT4 Client connection on port 5555... (Press Ctrl+C to stop)" -ForegroundColor Yellow
-        Start-Sleep -Seconds 10
     }
 
-    # 4. Run Python Trade Evaluator & AI Notifier
-    Write-Host "`n[4/4] Running Python & Gemini AI Trade Evaluator..." -ForegroundColor Yellow
-    
-    $PythonCmd = "python"
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        $PythonCmd = "py"
-    }
-
-    $EvalArgs = @("python/evaluator/main.py", "--db", "trade_pipeline.db")
-    if ($WebhookUrl -ne "") {
-        $EvalArgs += @("--webhook", $WebhookUrl)
-    }
-
-    & $PythonCmd @EvalArgs
-
+    # Verify Metrics via Go REST API
+    $metrics = Invoke-RestMethod -Uri "http://localhost:8080/api/metrics" -Method Get
     Write-Host "`n======================================================" -ForegroundColor Green
-    Write-Host "[SUCCESS] MT4 Trading Pipeline execution completed successfully!" -ForegroundColor Green
+    Write-Host "✅ Pipeline execution verified successfully via Go REST API!" -ForegroundColor Green
+    Write-Host "   Total Trades: $($metrics.total_trades) | Win Rate: $($metrics.win_rate)% | Profit Factor: $($metrics.profit_factor)" -ForegroundColor Green
+    Write-Host "   Web Cockpit : http://localhost:8080" -ForegroundColor Cyan
     Write-Host "======================================================" -ForegroundColor Green
 }
 finally {
-    # Clean up server process
-    if ($ServerProcess -and -not $ServerProcess.HasExited) {
-        Write-Host "`n[Cleanup] Stopping Gateway Server (PID: $($ServerProcess.Id))..." -ForegroundColor Gray
-        Stop-Process -Id $ServerProcess.Id -Force -ErrorAction SilentlyContinue
+    if ($GatewayProcess -and -not $GatewayProcess.HasExited) {
+        Stop-Process -Id $GatewayProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($GoProcess -and -not $GoProcess.HasExited) {
+        Stop-Process -Id $GoProcess.Id -Force -ErrorAction SilentlyContinue
     }
 }
