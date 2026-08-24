@@ -36,31 +36,40 @@ input int    FibLookbackBars = 50;      // Lookback Bars
 input string StrategyHeader = "=== MULTI-FILTER MEAN REVERSION ===";
 input int    PyramiddingMax = 2;        // ピラミッティング上限 (最大ポジション数)
 input int    TimeoutMinutes = 120;      // タイムベース強制決済 (分, 0で無効)
-input bool   EnableHourFilter = true;   // 24時間稼働制御を有効化
-input bool   Hour00_Active = true;      // 00:00 - 00:59
-input bool   Hour01_Active = true;      // 01:00 - 01:59
-input bool   Hour02_Active = true;      // 02:00 - 02:59
-input bool   Hour03_Active = true;      // 03:00 - 03:59
-input bool   Hour04_Active = true;      // 04:00 - 04:59
-input bool   Hour05_Active = true;      // 05:00 - 05:59
-input bool   Hour06_Active = true;      // 06:00 - 06:59
-input bool   Hour07_Active = true;      // 07:00 - 07:59
-input bool   Hour08_Active = true;      // 08:00 - 08:59 (東京前)
-input bool   Hour09_Active = true;      // 09:00 - 09:59 (東京オープン)
-input bool   Hour10_Active = true;      // 10:00 - 10:59 (仲値)
-input bool   Hour11_Active = true;      // 11:00 - 11:59
-input bool   Hour12_Active = true;      // 12:00 - 12:59
-input bool   Hour13_Active = true;      // 13:00 - 13:59
-input bool   Hour14_Active = true;      // 14:00 - 14:59
-input bool   Hour15_Active = true;      // 15:00 - 15:59 (欧州前)
-input bool   Hour16_Active = true;      // 16:00 - 16:59 (ロンドンオープン)
+
+// --- 取引時間帯制御 (日本時間 JST 16:00 - 24:00 設定) ---
+input string TimeFilterHeader = "=== JST TRADING HOUR FILTER ===";
+input bool   EnableHourFilter   = true; // 時間帯フィルターを有効化
+input bool   UseJSTDirectRange  = true; // 日本時間ダイレクト範囲指定 (16:00-24:00) を使用
+input int    StartJSTHour       = 16;   // 開始時間 (日本時間 JST: 16時)
+input int    EndJSTHour         = 24;   // 終了時間 (日本時間 JST: 24時 = 23:59まで)
+input int    BrokerToJST_Diff   = 6;    // MT4サーバー時間と日本時間の時差 (夏時間: 6, 冬時間: 7, 楽天JST: 0)
+
+// 詳細な1時間別個別制御 (UseJSTDirectRange = false の場合に使用)
+input bool   Hour00_Active = false;     // 00:00 - 00:59
+input bool   Hour01_Active = false;     // 01:00 - 01:59
+input bool   Hour02_Active = false;     // 02:00 - 02:59
+input bool   Hour03_Active = false;     // 03:00 - 03:59
+input bool   Hour04_Active = false;     // 04:00 - 04:59
+input bool   Hour05_Active = false;     // 05:00 - 05:59
+input bool   Hour06_Active = false;     // 06:00 - 06:59
+input bool   Hour07_Active = false;     // 07:00 - 07:59
+input bool   Hour08_Active = false;     // 08:00 - 08:59
+input bool   Hour09_Active = false;     // 09:00 - 09:59
+input bool   Hour10_Active = false;     // 10:00 - 10:59
+input bool   Hour11_Active = false;     // 11:00 - 11:59
+input bool   Hour12_Active = false;     // 12:00 - 12:59
+input bool   Hour13_Active = false;     // 13:00 - 13:59
+input bool   Hour14_Active = false;     // 14:00 - 14:59
+input bool   Hour15_Active = false;     // 15:00 - 15:59
+input bool   Hour16_Active = true;      // 16:00 - 16:59 (ロンドンオープン・JST稼働開始)
 input bool   Hour17_Active = true;      // 17:00 - 17:59
 input bool   Hour18_Active = true;      // 18:00 - 18:59
 input bool   Hour19_Active = true;      // 19:00 - 19:59
 input bool   Hour20_Active = true;      // 20:00 - 20:59
 input bool   Hour21_Active = true;      // 21:00 - 21:59 (NYオープン)
 input bool   Hour22_Active = true;      // 22:00 - 22:59
-input bool   Hour23_Active = true;      // 23:00 - 23:59
+input bool   Hour23_Active = true;      // 23:00 - 23:59 (JST 24:00直前まで)
 
 // Global Variables
 int sock = -1;
@@ -200,7 +209,7 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
    // 2. HUD テキストの描画
    CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [MULTI-FILTER MEAN REV] <<<", 10, "Arial Bold", clrDeepSkyBlue);
    CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[4-STATE REGIME] %s", display_regime), 9, "Arial Bold", regime_clr);
-   CreateOrUpdateLabel("RTA_HUD_KS", 18, 50, StringFormat("[AI KILL-SWITCH] %s", killswitch_str), 9, "Arial Bold", clrGold);
+   CreateOrUpdateLabel("RTA_HUD_KS", 18, 50, StringFormat("[AI KILL-SWITCH] %s | JST %d:00-%d:00", killswitch_str, StartJSTHour, EndJSTHour), 9, "Arial Bold", clrGold);
    CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, "[STRATEGY] BB(20,2.0) + RSI(14) + MTF-ATR + ADX | MaxPos: 2", 9, "Arial Bold", clrLightCyan);
 
    // 3. リアルタイム獲得pips・含み損益メーターの計算＆表示
@@ -762,7 +771,7 @@ double ParseJsonDouble(string json, string key, double default_val)
 }
 
 //+------------------------------------------------------------------+
-//| Check if current hour is allowed for trading (with 59m lookahead)|
+//| Check if current hour is allowed for trading (JST 16:00 - 24:00) |
 //+------------------------------------------------------------------+
 bool IsTradingHourAllowed(datetime t)
 {
@@ -773,7 +782,29 @@ bool IsTradingHourAllowed(datetime t)
    int current_h = dt.hour;
    int current_m = dt.min;
 
-   // 59分台の次時間先読みロジック: 次の一時間が停止設定なら59分での新規エントリーを禁止
+   // サーバー時間から日本時間 (JST) を算出
+   int jst_h = (current_h + BrokerToJST_Diff) % 24;
+
+   if(UseJSTDirectRange)
+   {
+      // 59分台の次時間先読み: 次の時間が JST 範囲外なら 59分での新規エントリーを禁止
+      if(current_m == 59)
+      {
+         int next_jst_h = (jst_h + 1) % 24;
+         bool next_allowed = (next_jst_h >= StartJSTHour && (EndJSTHour == 24 || next_jst_h < EndJSTHour));
+         if(!next_allowed)
+         {
+            PrintFormat("[RakutenTradeAgent] ⏳ 59-min lookahead: Next hour (JST %02d:00) is OUT OF SESSION (%d:00-%d:00). Skipping entry.",
+               next_jst_h, StartJSTHour, EndJSTHour);
+            return false;
+         }
+      }
+
+      bool allowed = (jst_h >= StartJSTHour && (EndJSTHour == 24 || jst_h < EndJSTHour));
+      return allowed;
+   }
+
+   // 1時間個別フラグでの判定
    if(current_m == 59)
    {
       int next_h = (current_h + 1) % 24;

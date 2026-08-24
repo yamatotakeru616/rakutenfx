@@ -201,6 +201,25 @@ function initBacktestCharts() {
     });
 }
 
+let currentJstStart = 16;
+let currentJstEnd = 24;
+
+function updateJstPreset(val) {
+    if (val === '16-24') {
+        currentJstStart = 16;
+        currentJstEnd = 24;
+        document.getElementById('val-jst-hours').textContent = '16:00 - 24:00';
+    } else if (val === '09-24') {
+        currentJstStart = 9;
+        currentJstEnd = 24;
+        document.getElementById('val-jst-hours').textContent = '09:00 - 24:00';
+    } else {
+        currentJstStart = 0;
+        currentJstEnd = 24;
+        document.getElementById('val-jst-hours').textContent = '24時間フル稼働';
+    }
+}
+
 // Run 1-Year Backtest
 async function runOneYearBacktest() {
     const btn = document.getElementById('btn-run-backtest');
@@ -222,7 +241,10 @@ async function runOneYearBacktest() {
         lot_size: 0.25,
         stop_loss_pips: 15.0,
         take_profit_pips: 30.0,
-        spread_pips: 0.2
+        spread_pips: 0.2,
+        enable_hour_filter: true,
+        start_jst_hour: currentJstStart,
+        end_jst_hour: currentJstEnd
     };
 
     try {

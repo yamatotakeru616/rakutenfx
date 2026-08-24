@@ -261,6 +261,14 @@
                         <label>Timeout (min): <span id="val-timeout">120</span></label>
                         <input type="range" id="param-timeout" min="30" max="240" step="30" value="120" oninput="document.getElementById('val-timeout').textContent=this.value">
                     </div>
+                    <div class="param-item">
+                        <label>JST Session (時): <span id="val-jst-hours">16:00 - 24:00</span></label>
+                        <select id="param-jst-preset" class="hud-select" onchange="updateJstPreset(this.value)" style="background: rgba(0,0,0,0.5); color: var(--accent-gold); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-family: var(--font-mono); font-size: 11px;">
+                            <option value="16-24" selected>JST 16:00 - 24:00 (欧州・NY前)</option>
+                            <option value="09-24">JST 09:00 - 24:00 (東京〜NY)</option>
+                            <option value="00-24">JST 24時間フル稼働</option>
+                        </select>
+                    </div>
                 </div>
             </section>
 

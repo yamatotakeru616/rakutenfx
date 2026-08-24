@@ -23,25 +23,31 @@ type StrategyParams struct {
 	StopLossPips   float64 `json:"stop_loss_pips"`   // e.g. 15.0
 	TakeProfitPips float64 `json:"take_profit_pips"` // e.g. 30.0
 	SpreadPips     float64 `json:"spread_pips"`      // e.g. 0.2
+	EnableHourFilter bool  `json:"enable_hour_filter"`// e.g. true
+	StartJSTHour   int     `json:"start_jst_hour"`   // e.g. 16
+	EndJSTHour     int     `json:"end_jst_hour"`     // e.g. 24
 }
 
 func DefaultStrategyParams() StrategyParams {
 	return StrategyParams{
-		BBPeriod:       20,
-		BBStdDev:       2.0,
-		RSIPeriod:      14,
-		RSIOversold:    30.0,
-		RSIOverbought:  70.0,
-		ADXPeriod:      14,
-		ADXThreshold:   25.0,
-		ATRLookback:    50,
-		ATRFactor:      1.5,
-		PyramiddingMax: 2,
-		TimeoutMinutes: 120,
-		LotSize:        0.25,
-		StopLossPips:   15.0,
-		TakeProfitPips: 30.0,
-		SpreadPips:     0.2,
+		BBPeriod:         20,
+		BBStdDev:         2.0,
+		RSIPeriod:        14,
+		RSIOversold:      30.0,
+		RSIOverbought:    70.0,
+		ADXPeriod:        14,
+		ADXThreshold:     25.0,
+		ATRLookback:      50,
+		ATRFactor:        1.5,
+		PyramiddingMax:   2,
+		TimeoutMinutes:   120,
+		LotSize:          0.25,
+		StopLossPips:     15.0,
+		TakeProfitPips:   30.0,
+		SpreadPips:       0.2,
+		EnableHourFilter: true,
+		StartJSTHour:     16,
+		EndJSTHour:       24,
 	}
 }
 
@@ -229,12 +235,26 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			})
 		}
 
-		// 2. 59-minute Lookahead Skip
+		// 2. JST Trading Hour Filter (e.g. 16:00 - 24:00)
+		if params.EnableHourFilter {
+			jstHour := (currentBar.Time.Hour() + 9) % 24 // UTC to JST
+			if currentBar.Time.Minute() == 59 {
+				nextJstHour := (jstHour + 1) % 24
+				if nextJstHour < params.StartJSTHour || (params.EndJSTHour < 24 && nextJstHour >= params.EndJSTHour) {
+					continue // 59-min lookahead: next hour is out of session
+				}
+			}
+			if jstHour < params.StartJSTHour || (params.EndJSTHour < 24 && jstHour >= params.EndJSTHour) {
+				continue
+			}
+		}
+
+		// 3. 59-minute Lookahead Skip (General)
 		if currentBar.Time.Minute() == 59 {
 			continue
 		}
 
-		// 3. 4-State Regime Filter
+		// 4. 4-State Regime Filter
 		isAtrHigh := atr[i] > (atrSMA[i] * params.ATRFactor)
 		isAdxHigh := adx[i] >= params.ADXThreshold
 
