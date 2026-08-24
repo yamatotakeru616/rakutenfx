@@ -1,42 +1,58 @@
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use tracing::{info, warn};
 
 use crate::bar_generator::{BarGenerator, DowBreakout, Timeframe};
 use crate::indicators::TechnicalIndicators;
-use crate::models::{Signal, SignalAction, Tick};
+use crate::models::{ExecutionType, MarketRegimeState, Signal, SignalAction, Tick};
 
 #[derive(Debug, Clone)]
 pub struct StrategyConfig {
-    pub short_period: usize,
-    pub long_period: usize,
+    // ボリンジャーバンド設定
+    pub bb_period: usize,
+    pub bb_dev: f64,
+    // RSI設定
     pub rsi_period: usize,
-    pub atr_period: usize,
-    pub fib_swing_period: usize,        // フィボナッチスイング高安値判定期間
-    pub dow_lookback: usize,            // 下位足ダウ転換判定ルックバック本数
     pub rsi_overbought: f64,
     pub rsi_oversold: f64,
-    pub target_risk_per_trade_jpy: f64, // 1トレードの許容最大損失額 (円)
+    // MTF-ATR設定 (上位足ボラティリティフィルター)
+    pub atr_period: usize,
+    pub mtf_atr_sma_period: usize,
+    pub mtf_atr_threshold_mult: f64,
+    // ADX設定 (トレンド強度フィルター)
+    pub adx_period: usize,
+    pub adx_threshold: f64,
+    // フィボナッチ ＆ ダウ設定
+    pub fib_swing_period: usize,
+    pub dow_lookback: usize,
+    // 資金管理 ＆ リスク設定
+    pub target_risk_per_trade_jpy: f64,
     pub min_signal_interval_sec: i64,
-    pub micro_sl_min_pips: f64,         // 極小損切り下限 (pips)
-    pub max_lot_limit: f64,             // 最大許容ロット
+    pub micro_sl_min_pips: f64,
+    pub max_lot_limit: f64,
+    pub max_positions: usize, // ピラミッティング上限 (最大2)
 }
 
 impl Default for StrategyConfig {
     fn default() -> Self {
         Self {
-            short_period: 5,
-            long_period: 20,
+            bb_period: 20,
+            bb_dev: 2.0,
             rsi_period: 14,
-            atr_period: 14,
-            fib_swing_period: 50,
-            dow_lookback: 6,
             rsi_overbought: 70.0,
             rsi_oversold: 30.0,
-            target_risk_per_trade_jpy: 2000.0, // 2,000円固定リスク
+            atr_period: 14,
+            mtf_atr_sma_period: 50,
+            mtf_atr_threshold_mult: 1.5,
+            adx_period: 14,
+            adx_threshold: 25.0, // USD/JPY基準 (GBPJPYは動的調整)
+            fib_swing_period: 50,
+            dow_lookback: 6,
+            target_risk_per_trade_jpy: 2000.0,
             min_signal_interval_sec: 15,
-            micro_sl_min_pips: 4.0,            // 極小SL 4.0 pips
-            max_lot_limit: 1.00,               // 1.00 Lotまで許容
+            micro_sl_min_pips: 4.0,
+            max_lot_limit: 1.00,
+            max_positions: 2,
         }
     }
 }
@@ -46,7 +62,7 @@ pub struct SignalEngine {
     indicators: HashMap<String, TechnicalIndicators>,
     bar_generators: HashMap<String, BarGenerator>,
     last_signal_time: HashMap<String, DateTime<Utc>>,
-    last_sma_diff: HashMap<String, f64>,
+    current_position_count: HashMap<String, (SignalAction, usize)>,
 }
 
 impl SignalEngine {
@@ -56,25 +72,27 @@ impl SignalEngine {
             indicators: HashMap::new(),
             bar_generators: HashMap::new(),
             last_signal_time: HashMap::new(),
-            last_sma_diff: HashMap::new(),
+            current_position_count: HashMap::new(),
         }
     }
 
-    /// 通貨ペアごとの 1 pip の価格単位と最大許容スプレッド (pips) を取得
-    fn get_symbol_profile(&self, symbol: &str) -> (f64, f64, f64) {
-        // (pip_unit, max_allowed_spread_pips, pip_value_per_lot_jpy)
+    /// 通貨ペアごとの 1 pip の価格単位、最大許容スプレッド (pips)、適正ADX閾値を取得
+    fn get_symbol_profile(&self, symbol: &str) -> (f64, f64, f64, f64) {
+        // (pip_unit, max_allowed_spread_pips, pip_value_per_lot_jpy, adx_threshold)
         let upper = symbol.to_uppercase();
-        if upper.contains("JPY") {
-            (0.01, 3.0, 1000.0) // 1ロット(10万通貨)で 1pip = 1,000円
+        if upper.contains("GBP") {
+            (0.01, 3.5, 1000.0, 15.0) // GBPJPY等はADX閾値を低めに設定
+        } else if upper.contains("JPY") {
+            (0.01, 3.0, 1000.0, self.config.adx_threshold)
         } else if upper.contains("XAU") || upper.contains("GOLD") {
-            (0.1, 70.0, 1500.0) // ゴールド
+            (0.1, 70.0, 1500.0, 20.0)
         } else {
-            (0.0001, 2.5, 15000.0 * 0.0001 * 100000.0) // ドルストレート (EURUSD等: 1pip ≈ 1500円)
+            (0.0001, 2.5, 15000.0 * 0.0001 * 100000.0, self.config.adx_threshold)
         }
     }
 
     pub fn process_tick(&mut self, tick: &Tick) -> Option<Signal> {
-        let (pip_unit, max_spread_pips, pip_value_jpy) = self.get_symbol_profile(&tick.symbol);
+        let (pip_unit, max_spread_pips, pip_value_jpy, custom_adx_threshold) = self.get_symbol_profile(&tick.symbol);
 
         // 1. スプレッド拡大ガード (Max Spread Filter)
         let raw_spread = tick.ask - tick.bid;
@@ -90,7 +108,15 @@ impl SignalEngine {
 
         let mid_price = (tick.bid + tick.ask) / 2.0;
 
-        // 1. 下位足 (M1) バーのリアルタイム合成とダウ転換判定
+        // 2. 指標データの更新 ＆ インジケーター計算
+        let ind = self
+            .indicators
+            .entry(tick.symbol.clone())
+            .or_insert_with(|| TechnicalIndicators::new(self.config.mtf_atr_sma_period.max(self.config.bb_period) + 100));
+
+        ind.add_price(mid_price);
+
+        // 3. M1 バー生成 ＆ ダウ転換判定
         let bar_gen = self
             .bar_generators
             .entry(tick.symbol.clone())
@@ -103,22 +129,26 @@ impl SignalEngine {
             DowBreakout::None
         };
 
-        let ind = self
-            .indicators
-            .entry(tick.symbol.clone())
-            .or_insert_with(|| TechnicalIndicators::new(self.config.fib_swing_period.max(self.config.long_period) + 50));
-
-        ind.add_price(mid_price);
-
-        let short_sma = ind.sma(self.config.short_period)?;
-        let long_sma = ind.sma(self.config.long_period)?;
+        // 各種インジケーターの算出
+        let bb = ind.bollinger_bands(self.config.bb_period, self.config.bb_dev)?;
         let rsi = ind.rsi(self.config.rsi_period).unwrap_or(50.0);
         let atr = ind.atr(self.config.atr_period).unwrap_or(pip_unit * 15.0);
-        let fib_opt = ind.fibonacci_retracement_up(self.config.fib_swing_period);
+        let adx = ind.adx(self.config.adx_period).unwrap_or(20.0);
+        let (_, _, is_atr_spike) = ind.mtf_atr_filter(
+            self.config.atr_period,
+            self.config.mtf_atr_sma_period,
+            self.config.mtf_atr_threshold_mult,
+        ).unwrap_or((atr, atr, false));
 
-        let current_diff = short_sma - long_sma;
-        let prev_diff = *self.last_sma_diff.get(&tick.symbol).unwrap_or(&current_diff);
-        self.last_sma_diff.insert(tick.symbol.clone(), current_diff);
+        let is_adx_trend = adx >= custom_adx_threshold;
+
+        // 4. マーケットコンテキスト 4ステート判定
+        let regime = match (is_atr_spike, is_adx_trend) {
+            (true, true) => MarketRegimeState::Purple,   // ボラ高 + トレンド強 (二重フィルター)
+            (true, false) => MarketRegimeState::Orange,  // ボラ高のみ (ATRフィルター)
+            (false, true) => MarketRegimeState::Red,     // トレンド強のみ (ADXフィルター)
+            (false, false) => MarketRegimeState::Clear,  // フィルター未作動 (エントリー許可)
+        };
 
         // クールダウン期間の確認
         if let Some(last_time) = self.last_signal_time.get(&tick.symbol) {
@@ -128,94 +158,93 @@ impl SignalEngine {
             }
         }
 
-        // 2. フィボナッチ ＆ 動的極小SL/TP ＆ ポジションサイジング計算
-        let raw_atr_pips = atr / pip_unit;
-        
-        // ダウ理論転換時の直近安値/高値に基づく精密極小SL
-        let (calculated_sl_pips, is_dow_triggered) = match dow_breakout {
-            DowBreakout::BullishBreakout { recent_swing_low, .. } => {
-                let sl_dist_pips = ((mid_price - recent_swing_low) / pip_unit).max(self.config.micro_sl_min_pips);
-                (sl_dist_pips.clamp(self.config.micro_sl_min_pips, 50.0).round(), true)
+        // 5. 59分台先読みガード (Next Hour Lookahead)
+        let minute = tick.time.minute();
+        if minute == 59 {
+            // XX時59分の境界線リスク回避（安全措置）
+            info!("⏳ 59-minute boundary lookahead filter active. Skipping new entries.");
+            return None;
+        }
+
+        // 6. コア逆張りシグナル判定 (BB + RSI 平均回帰)
+        let is_buy_mr = mid_price < bb.lower && rsi < self.config.rsi_oversold;
+        let is_sell_mr = mid_price > bb.upper && rsi > self.config.rsi_overbought;
+
+        // ダウブレイクアウト（フィボナッチ順張り）との複合エッジ
+        let is_buy_dow = matches!(dow_breakout, DowBreakout::BullishBreakout { .. });
+        let is_sell_dow = matches!(dow_breakout, DowBreakout::BearishBreakout { .. });
+
+        let buy_triggered = (is_buy_mr || is_buy_dow) && regime == MarketRegimeState::Clear;
+        let sell_triggered = (is_sell_mr || is_sell_dow) && regime == MarketRegimeState::Clear;
+
+        if !buy_triggered && !sell_triggered {
+            return None;
+        }
+
+        // 7. ポジション管理・土転 (Reverse) ＆ ピラミッティング (最大2)
+        let (current_action, current_count) = self
+            .current_position_count
+            .get(&tick.symbol)
+            .copied()
+            .unwrap_or((SignalAction::Hold, 0));
+
+        let (action, exec_type) = if buy_triggered {
+            if current_action == SignalAction::Sell && current_count > 0 {
+                (SignalAction::Buy, ExecutionType::Reverse) // ドテン買い
+            } else if current_action == SignalAction::Buy && current_count < self.config.max_positions {
+                (SignalAction::Buy, ExecutionType::Pyramidding) // ピラミッティング買い
+            } else if current_count == 0 {
+                (SignalAction::Buy, ExecutionType::New) // 新規買い
+            } else {
+                return None; // ポジション上限到達
             }
-            DowBreakout::BearishBreakout { recent_swing_high, .. } => {
-                let sl_dist_pips = ((recent_swing_high - mid_price) / pip_unit).max(self.config.micro_sl_min_pips);
-                (sl_dist_pips.clamp(self.config.micro_sl_min_pips, 50.0).round(), true)
-            }
-            DowBreakout::None => {
-                let default_sl = (raw_atr_pips * 0.8).clamp(self.config.micro_sl_min_pips, 50.0).round();
-                (default_sl, false)
+        } else {
+            if current_action == SignalAction::Buy && current_count > 0 {
+                (SignalAction::Sell, ExecutionType::Reverse) // ドテン売り
+            } else if current_action == SignalAction::Sell && current_count < self.config.max_positions {
+                (SignalAction::Sell, ExecutionType::Pyramidding) // ピラミッティング売り
+            } else if current_count == 0 {
+                (SignalAction::Sell, ExecutionType::New) // 新規売り
+            } else {
+                return None;
             }
         };
 
-        let stop_loss_pips = calculated_sl_pips;
-        // リスクリワード 1:2.5〜3.0 を目標設定
-        let take_profit_pips = (stop_loss_pips * 2.5).round();
+        // 8. 動的SL/TP ＆ ポジションサイジング計算
+        let raw_atr_pips = (atr / pip_unit).max(10.0);
+        let stop_loss_pips = (raw_atr_pips * 1.0).clamp(self.config.micro_sl_min_pips, 50.0).round();
+        let take_profit_pips = (stop_loss_pips * 2.0).round(); // リスクリワード 1:2
 
-        // 許容損失額(2,000円)からロットサイズを逆算 (0.01〜max_lot_limitにクランプ)
         let calculated_lot = (self.config.target_risk_per_trade_jpy / (stop_loss_pips * pip_value_jpy))
             .clamp(0.01, self.config.max_lot_limit);
         let lot = (calculated_lot * 100.0).round() / 100.0;
 
-        // フィボナッチゾーン情報 (存在する場合)
-        let fib_info = if let Some(fib) = fib_opt {
-            let in_fib_zone = mid_price >= fib.level_786 && mid_price <= fib.level_382;
-            if in_fib_zone {
-                format!("FIB_ZONE[38.2%: {:.3}, 50%: {:.3}, 61.8%: {:.3}]", fib.level_382, fib.level_500, fib.level_618)
-            } else {
-                "FIB_NORMAL".to_string()
-            }
-        } else {
-            "FIB_N/A".to_string()
+        let reason = format!(
+            "MEAN_REV[BB={:.3}/{:.3}, RSI={:.1}, ADX={:.1}, ATR={:.1}pips, Regime={:?}, Exec={:?}]",
+            bb.lower, bb.upper, rsi, adx, raw_atr_pips, regime, exec_type
+        );
+
+        info!("🎯 Generated {:?} Signal for {}: {}", action, tick.symbol, reason);
+        self.last_signal_time.insert(tick.symbol.clone(), tick.time);
+
+        // ポジション数更新
+        let new_count = match exec_type {
+            ExecutionType::New => 1,
+            ExecutionType::Pyramidding => current_count + 1,
+            ExecutionType::Reverse => 1,
         };
+        self.current_position_count.insert(tick.symbol.clone(), (action, new_count));
 
-        // 判定条件1: 下位足ダウ上昇ブレイク または ゴールデンクロス & RSIフィルター
-        let is_buy_sma = prev_diff <= 0.0 && current_diff > 0.0;
-        let is_buy_dow = matches!(dow_breakout, DowBreakout::BullishBreakout { .. });
-
-        if (is_buy_dow || is_buy_sma) && rsi < self.config.rsi_overbought {
-            let trigger_tag = if is_buy_dow { "DOW_BREAKOUT_BULL" } else { "SMA_GOLDEN_CROSS" };
-            let reason = format!(
-                "{} + RSI({:.1}) + {} | MICRO_SL(SL={:.0}pips, TP={:.0}pips, Lot={:.2}, DowTrigger={})",
-                trigger_tag, rsi, fib_info, stop_loss_pips, take_profit_pips, lot, is_dow_triggered
-            );
-            info!("🎯 Generated BUY Signal for {}: {}", tick.symbol, reason);
-            self.last_signal_time.insert(tick.symbol.clone(), tick.time);
-
-            return Some(Signal {
-                symbol: tick.symbol.clone(),
-                action: SignalAction::Buy,
-                lot,
-                stop_loss_pips,
-                take_profit_pips,
-                reason,
-                created_at: Utc::now(),
-            });
-        }
-
-        // 判定条件2: 下位足ダウ下降ブレイク または デッドクロス & RSIフィルター
-        let is_sell_sma = prev_diff >= 0.0 && current_diff < 0.0;
-        let is_sell_dow = matches!(dow_breakout, DowBreakout::BearishBreakout { .. });
-
-        if (is_sell_dow || is_sell_sma) && rsi > self.config.rsi_oversold {
-            let trigger_tag = if is_sell_dow { "DOW_BREAKOUT_BEAR" } else { "SMA_DEAD_CROSS" };
-            let reason = format!(
-                "{} + RSI({:.1}) + {} | MICRO_SL(SL={:.0}pips, TP={:.0}pips, Lot={:.2}, DowTrigger={})",
-                trigger_tag, rsi, fib_info, stop_loss_pips, take_profit_pips, lot, is_dow_triggered
-            );
-            info!("🎯 Generated SELL Signal for {}: {}", tick.symbol, reason);
-            self.last_signal_time.insert(tick.symbol.clone(), tick.time);
-
-            return Some(Signal {
-                symbol: tick.symbol.clone(),
-                action: SignalAction::Sell,
-                lot,
-                stop_loss_pips,
-                take_profit_pips,
-                reason,
-                created_at: Utc::now(),
-            });
-        }
-
-        None
+        Some(Signal {
+            symbol: tick.symbol.clone(),
+            action,
+            lot,
+            stop_loss_pips,
+            take_profit_pips,
+            reason,
+            regime,
+            exec_type,
+            created_at: Utc::now(),
+        })
     }
 }

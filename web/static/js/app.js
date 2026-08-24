@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchMetrics();
     fetchTrades();
     fetchSignals();
+    fetchRegime();
     fetchSystemStatus();
     connectWebSocket();
 });
@@ -195,15 +196,46 @@ function renderSignals(signals) {
     signals.forEach(s => {
         const row = document.createElement('div');
         row.className = `signal-row ${s.action}`;
+        const regimeTag = s.regime ? `[${s.regime}] ` : '';
+        const execTag = s.exec_type ? `(${s.exec_type}) ` : '';
         row.innerHTML = `
             <div>
-                <strong>${s.symbol}</strong> [${s.action}] - Lot: ${s.lot.toFixed(2)}
-                <div style="font-size: 10px; color: #8899a6;">SL: ${s.stop_loss_pips} pips / TP: ${s.take_profit_pips} pips (${s.reason})</div>
+                <strong>${s.symbol}</strong> [${s.action}] ${execTag}- Lot: ${s.lot.toFixed(2)}
+                <div style="font-size: 10px; color: #8899a6;">${regimeTag}SL: ${s.stop_loss_pips} pips / TP: ${s.take_profit_pips} pips (${s.reason})</div>
             </div>
             <div style="font-size: 10px; color: #8899a6;">${s.created_at}</div>
         `;
         list.appendChild(row);
     });
+}
+
+// Fetch 4-State Market Regime Context
+async function fetchRegime() {
+    try {
+        const res = await fetch('/api/regime?symbol=USDJPY');
+        if (!res.ok) return;
+        const data = await res.json();
+        updateRegimeUI(data);
+    } catch (err) {
+        console.error('Failed to fetch regime:', err);
+    }
+}
+
+function updateRegimeUI(reg) {
+    const badge = document.getElementById('hud-regime-badge');
+    const text = document.getElementById('regime-status-text');
+    const dot = document.getElementById('regime-dot');
+
+    const regime = reg.regime ? reg.regime.toUpperCase() : 'CLEAR';
+    badge.className = `regime-badge state-${regime.toLowerCase()}`;
+    text.textContent = `REGIME: ${regime} (${reg.entry_allowed ? 'ENTRY OK' : 'BLOCKED'})`;
+
+    // Highlight state pill in subpanel
+    document.querySelectorAll('.state-pill').forEach(pill => {
+        pill.classList.remove('active');
+    });
+    const activePill = document.querySelector(`.state-pill.state-${regime.toLowerCase()}`);
+    if (activePill) activePill.classList.add('active');
 }
 
 // Run Gemini AI Evaluation

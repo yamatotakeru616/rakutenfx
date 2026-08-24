@@ -106,6 +106,8 @@ async fn handle_connection(
                             stop_loss_pips: 0.0,
                             take_profit_pips: 0.0,
                             reason: "SUPPRESSED_BY_AI_KILL_SWITCH".to_string(),
+                            regime: crate::models::MarketRegimeState::Clear,
+                            exec_type: crate::models::ExecutionType::New,
                             created_at: chrono::Utc::now(),
                         })
                     }
@@ -117,6 +119,8 @@ async fn handle_connection(
                         stop_loss_pips: 0.0,
                         take_profit_pips: 0.0,
                         reason: "HOLD".to_string(),
+                        regime: crate::models::MarketRegimeState::Clear,
+                        exec_type: crate::models::ExecutionType::New,
                         created_at: chrono::Utc::now(),
                     })
                 }

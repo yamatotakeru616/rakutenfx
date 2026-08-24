@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rakuten FX Pro Trader Cockpit - Go Native AI Engine</title>
+    <title>Rakuten FX Pro Trader Cockpit - Multi-Filter Mean Reversion Engine</title>
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,18 +20,19 @@
                 <div class="hud-logo-icon">⚡</div>
                 <div class="brand-text">
                     <span class="brand-title">RAKUTEN FX QUANT COCKPIT</span>
-                    <span class="brand-subtitle">GO SINGLE BINARY // RUST GATEWAY PIPELINE</span>
+                    <span class="brand-subtitle">MULTI-FILTER MEAN REVERSION (BB + RSI + MTF-ATR + ADX)</span>
                 </div>
             </div>
 
             <div class="hud-status-panel">
-                <div class="status-badge" id="system-status-badge">
-                    <span class="pulse-dot"></span>
-                    <span id="system-status-text">GO SERVER: ONLINE</span>
+                <!-- 4-State Market Regime Badge -->
+                <div class="regime-badge state-clear" id="hud-regime-badge">
+                    <span class="pulse-dot green" id="regime-dot"></span>
+                    <span id="regime-status-text">REGIME: CLEAR (RANGE)</span>
                 </div>
                 <div class="status-badge gateway-badge">
                     <span class="pulse-dot green"></span>
-                    <span>GATEWAY: PORT 5555</span>
+                    <span>GATEWAY: 5555</span>
                 </div>
                 <div class="status-badge killswitch-badge" id="hud-killswitch-status">
                     <span>KILL-SWITCH: NORMAL</span>
@@ -70,7 +71,7 @@
 
             <div class="kpi-card glow-gold">
                 <div class="kpi-header">
-                    <span class="kpi-title">PROFIT FACTOR (PF)</span>
+                    <span class="kpi-title">PROFIT FACTOR (目標 1.30+)</span>
                     <span class="kpi-icon">📈</span>
                 </div>
                 <div class="kpi-value highlight-gold" id="kpi-profit-factor">0.00</div>
@@ -95,7 +96,7 @@
 
         <!-- Main Dashboard Split Grid -->
         <main class="dashboard-main-grid">
-            <!-- Left: Equity Curve Chart & Signals -->
+            <!-- Left: Equity Curve Chart & 4-State Filter Subpanel -->
             <section class="chart-section glass-panel">
                 <div class="panel-header">
                     <h2>📈 EQUITY CURVE & PERFORMANCE ACCUMULATION</h2>
@@ -105,19 +106,28 @@
                     <canvas id="equityChart"></canvas>
                 </div>
 
-                <!-- Strategy Rules & Signals Subpanel -->
+                <!-- 4-State Multi-Filter & Strategy Signals Subpanel -->
                 <div class="signals-subpanel">
                     <div class="panel-header">
-                        <h3>⚡ REAL-TIME STRATEGY SIGNALS & DOW CUT (4.0 Pips)</h3>
-                        <button class="small-btn" onclick="fetchSignals()">Refresh</button>
+                        <h3>⚡ 4-STATE MULTI-FILTER & REVERSE / PYRAMIDDING SIGNALS</h3>
+                        <button class="small-btn" onclick="fetchSignals(); fetchRegime();">Refresh</button>
                     </div>
+
+                    <!-- 4-State Visual Indicator Bar -->
+                    <div class="regime-state-bar" id="regime-state-bar">
+                        <div class="state-pill state-purple" title="ATR高 + ADX強 (二重フィルター)">● PURPLE (ATR+ADX)</div>
+                        <div class="state-pill state-orange" title="ATR高のみ (異常ボラティリティ)">● ORANGE (ATR SPIKE)</div>
+                        <div class="state-pill state-red" title="ADX強のみ (強トレンド警戒)">● RED (TREND ADX)</div>
+                        <div class="state-pill state-clear active" title="フィルター未作動 (エントリー許可)">● CLEAR (ENTRY OK)</div>
+                    </div>
+
                     <div class="signals-list" id="signals-list">
                         <!-- Signals rendered by JS -->
                     </div>
                 </div>
             </section>
 
-            <!-- Right: Gemini AI Chief Analyst & Reflection -->
+            <!-- Right: Gemini AI Chief Analyst & 4-State Regime Reflection -->
             <section class="ai-analyst-section glass-panel">
                 <div class="panel-header">
                     <h2>🤖 GEMINI AI QUANT CHIEF ANALYST</h2>
@@ -131,7 +141,7 @@
                         <div class="rank-circle" id="ai-overall-rank">S</div>
                         <div class="rank-details">
                             <h4 id="ai-report-title">AI Performance Review Engine Ready</h4>
-                            <p id="ai-report-summary">ボタンをクリックすると、Gemini APIが直近のトレード履歴・4.0pips損切り・フィボナッチ押し目を総合評価し、改善提案を出力します。</p>
+                            <p id="ai-report-summary">Gemini 2.5 Flash が BB+RSI 平均回帰・多層フィルター（ATR/ADX）・PF 1.3 目標達成度を総合評価します。</p>
                         </div>
                     </div>
 
@@ -139,16 +149,16 @@
                         <div class="point-box strengths">
                             <h4>✅ 検出された強み (Strengths)</h4>
                             <ul id="ai-strengths-list">
-                                <li>4.0pips極小損切りルールの徹底執行</li>
-                                <li>上位足フィボナッチ（61.8%）反発のエッジ活用</li>
+                                <li>BB(20, 2.0σ) + RSI(14) のAND条件によるバンドウォーク回避</li>
+                                <li>MTF-ATR異常ボラティリティ時の安全自動停止</li>
                             </ul>
                         </div>
 
                         <div class="point-box weaknesses">
                             <h4>⚠️ 改善課題 & アクションプラン (Action Plan)</h4>
                             <ul id="ai-weaknesses-list">
-                                <li>ロンドンオープン直後のボラティリティ急変への警戒</li>
-                                <li>推奨ロット 0.25 Lot を厳守し資金管理を維持</li>
+                                <li>土転 (Reverse) ＆ ピラミッティング (最大2) の確実な遂行</li>
+                                <li>タイムベース強制決済 (120分) による資金拘束リスク排除</li>
                             </ul>
                         </div>
                     </div>
@@ -192,7 +202,7 @@
 
         <!-- Footer -->
         <footer class="hud-footer">
-            <span>RAKUTEN FX QUANT COCKPIT v2.0 // GO SINGLE BINARY (modernc.org/sqlite)</span>
+            <span>RAKUTEN FX QUANT COCKPIT v2.1 // MULTI-FILTER MEAN REVERSION (BB+RSI+ATR+ADX)</span>
             <span>TCP PORT: 5555 (Rust) / 5556 (Go IPC) / 8080 (REST + WS)</span>
         </footer>
     </div>

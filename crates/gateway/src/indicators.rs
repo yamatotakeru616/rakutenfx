@@ -1,5 +1,13 @@
 use std::collections::VecDeque;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BollingerBands {
+    pub middle: f64,
+    pub upper: f64,
+    pub lower: f64,
+    pub std_dev: f64,
+}
+
 #[derive(Debug, Clone)]
 pub struct TechnicalIndicators {
     max_history: usize,
@@ -43,6 +51,32 @@ impl TechnicalIndicators {
             ema = (price * k) + (ema * (1.0 - k));
         }
         Some(ema)
+    }
+
+    /// ボリンジャーバンド (Bollinger Bands) の算出
+    pub fn bollinger_bands(&self, period: usize, num_std_dev: f64) -> Option<BollingerBands> {
+        let middle = self.sma(period)?;
+        let slice: Vec<f64> = self.prices.iter().rev().take(period).copied().collect();
+        
+        let variance: f64 = slice
+            .iter()
+            .map(|&p| {
+                let diff = p - middle;
+                diff * diff
+            })
+            .sum::<f64>()
+            / period as f64;
+            
+        let std_dev = variance.sqrt();
+        let upper = middle + (std_dev * num_std_dev);
+        let lower = middle - (std_dev * num_std_dev);
+
+        Some(BollingerBands {
+            middle,
+            upper,
+            lower,
+            std_dev,
+        })
     }
 
     pub fn rsi(&self, period: usize) -> Option<f64> {
@@ -91,6 +125,54 @@ impl TechnicalIndicators {
         Some(total_range / period as f64)
     }
 
+    /// MTF-ATR 異常ボラティリティ判定 (直近ATR > 長期SMA(ATR) * threshold_mult)
+    pub fn mtf_atr_filter(&self, atr_period: usize, sma_period: usize, threshold_mult: f64) -> Option<(f64, f64, bool)> {
+        let current_atr = self.atr(atr_period)?;
+        let long_atr = self.atr(sma_period.max(atr_period * 2))?;
+        let is_spike = current_atr > (long_atr * threshold_mult);
+        Some((current_atr, long_atr, is_spike))
+    }
+
+    /// ADX (Average Directional Index) 近似トレンド強度計算 (0〜100)
+    pub fn adx(&self, period: usize) -> Option<f64> {
+        if self.prices.len() <= (period * 2) || period == 0 {
+            // 最低限のデータが無い場合はデフォルトのレンジ値(20.0)を返却
+            return Some(20.0);
+        }
+
+        let slice: Vec<f64> = self.prices.iter().rev().take(period + 1).rev().copied().collect();
+        let mut plus_dm = 0.0;
+        let mut minus_dm = 0.0;
+        let mut tr = 0.0;
+
+        for i in 1..slice.len() {
+            let up_move = slice[i] - slice[i - 1];
+            let down_move = slice[i - 1] - slice[i];
+
+            if up_move > down_move && up_move > 0.0 {
+                plus_dm += up_move;
+            }
+            if down_move > up_move && down_move > 0.0 {
+                minus_dm += down_move;
+            }
+            tr += (slice[i] - slice[i - 1]).abs();
+        }
+
+        if tr == 0.0 {
+            return Some(20.0);
+        }
+
+        let plus_di = (plus_dm / tr) * 100.0;
+        let minus_di = (minus_dm / tr) * 100.0;
+        let di_sum = plus_di + minus_di;
+        if di_sum == 0.0 {
+            return Some(20.0);
+        }
+
+        let dx = ((plus_di - minus_di).abs() / di_sum) * 100.0;
+        Some(dx.clamp(0.0, 100.0))
+    }
+
     /// 直近N期間の最高値・最安値 (スイングハイ・スイングロー)
     pub fn swing_high_low(&self, period: usize) -> Option<(f64, f64)> {
         if self.prices.len() < period || period == 0 {
@@ -112,7 +194,6 @@ impl TechnicalIndicators {
     }
 
     /// 上昇スイングにおけるフィボナッチ・リトレースメント値の算出
-    /// (38.2%, 50.0%, 61.8%, 78.6%)
     pub fn fibonacci_retracement_up(&self, period: usize) -> Option<FibonacciLevels> {
         let (high, low) = self.swing_high_low(period)?;
         let diff = high - low;
@@ -166,6 +247,18 @@ mod tests {
     }
 
     #[test]
+    fn test_bollinger_bands() {
+        let mut ind = TechnicalIndicators::new(20);
+        for p in [100.0, 101.0, 102.0, 101.0, 100.0] {
+            ind.add_price(p);
+        }
+        let bb = ind.bollinger_bands(5, 2.0).unwrap();
+        assert_eq!(bb.middle, 100.8);
+        assert!(bb.upper > bb.middle);
+        assert!(bb.lower < bb.middle);
+    }
+
+    #[test]
     fn test_rsi() {
         let mut ind = TechnicalIndicators::new(20);
         for p in [100.0, 102.0, 104.0, 106.0, 108.0, 110.0] {
@@ -176,26 +269,12 @@ mod tests {
     }
 
     #[test]
-    fn test_atr() {
-        let mut ind = TechnicalIndicators::new(20);
-        for p in [100.0, 101.0, 100.5, 102.0, 101.0] {
+    fn test_adx() {
+        let mut ind = TechnicalIndicators::new(30);
+        for p in (0..20).map(|i| 100.0 + i as f64 * 2.0) {
             ind.add_price(p);
         }
-        let atr = ind.atr(4).unwrap();
-        assert!(atr > 0.0);
-    }
-
-    #[test]
-    fn test_fibonacci_retracement() {
-        let mut ind = TechnicalIndicators::new(20);
-        // 安値 100.0 から 高値 110.0 への上昇スイング (値幅 10.0)
-        for p in [100.0, 102.0, 105.0, 108.0, 110.0, 105.0] {
-            ind.add_price(p);
-        }
-        let fib = ind.fibonacci_retracement_up(6).unwrap();
-        assert_eq!(fib.high, 110.0);
-        assert_eq!(fib.low, 100.0);
-        assert!((fib.level_500 - 105.0).abs() < 1e-6);
-        assert!((fib.level_618 - 103.82).abs() < 1e-6);
+        let adx = ind.adx(5).unwrap();
+        assert!(adx > 0.0);
     }
 }

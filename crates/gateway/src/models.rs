@@ -10,6 +10,27 @@ pub enum SignalAction {
     Hold,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MarketRegimeState {
+    /// 紫色: ボラティリティ高 (ATR) ＋ トレンド強 (ADX)（二重フィルター作動）
+    Purple,
+    /// 橙色: ボラティリティ高のみ (ATRフィルター作動)
+    Orange,
+    /// 赤色: トレンド強のみ (ADXフィルター作動)
+    Red,
+    /// 無色/緑: フィルター未作動（エントリー許可状態）
+    Clear,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ExecutionType {
+    New,
+    Reverse,
+    Pyramidding,
+}
+
 pub fn parse_flexible_datetime(s: &str) -> Result<DateTime<Utc>, String> {
     // 1. RFC3339 / ISO8601
     if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
@@ -96,12 +117,24 @@ pub struct Signal {
     pub stop_loss_pips: f64,
     pub take_profit_pips: f64,
     pub reason: String,
+    #[serde(default = "default_regime")]
+    pub regime: MarketRegimeState,
+    #[serde(default = "default_exec_type")]
+    pub exec_type: ExecutionType,
     #[serde(
         deserialize_with = "deserialize_flexible_datetime",
         serialize_with = "serialize_datetime",
         default = "Utc::now"
     )]
     pub created_at: DateTime<Utc>,
+}
+
+fn default_regime() -> MarketRegimeState {
+    MarketRegimeState::Clear
+}
+
+fn default_exec_type() -> ExecutionType {
+    ExecutionType::New
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, MT4 Trading Pipeline"
 #property link      "https://example.com"
-#property version   "1.10"
+#property version   "2.10"
 #property strict
 
 // WinSock API imports for Windows Socket Communication
@@ -29,8 +29,38 @@ input int    MagicNumber = 888888;      // Magic Number
 input int    Slippage    = 3;           // Slippage (points)
 input bool   EnableAutoTrade = true;    // Enable Auto Demo Trade
 input bool   EnableVisualOverlay = true;// Enable Visual Fibonacci & Dow Overlay
-input ENUM_TIMEFRAMES FibTimeFrame = PERIOD_H1; // Fibonacci Higher-Timeframe
-input int    FibLookbackBars = 50;      // Fibonacci Lookback Bars (H1/M15/M5)
+input ENUM_TIMEFRAMES FibTimeFrame = PERIOD_H1; // Higher Timeframe
+input int    FibLookbackBars = 50;      // Lookback Bars
+
+// --- 戦略技術仕様: マルチフィルタ型逆張りアルゴリズム設定 ---
+input string StrategyHeader = "=== MULTI-FILTER MEAN REVERSION ===";
+input int    PyramiddingMax = 2;        // ピラミッティング上限 (最大ポジション数)
+input int    TimeoutMinutes = 120;      // タイムベース強制決済 (分, 0で無効)
+input bool   EnableHourFilter = true;   // 24時間稼働制御を有効化
+input bool   Hour00_Active = true;      // 00:00 - 00:59
+input bool   Hour01_Active = true;      // 01:00 - 01:59
+input bool   Hour02_Active = true;      // 02:00 - 02:59
+input bool   Hour03_Active = true;      // 03:00 - 03:59
+input bool   Hour04_Active = true;      // 04:00 - 04:59
+input bool   Hour05_Active = true;      // 05:00 - 05:59
+input bool   Hour06_Active = true;      // 06:00 - 06:59
+input bool   Hour07_Active = true;      // 07:00 - 07:59
+input bool   Hour08_Active = true;      // 08:00 - 08:59 (東京前)
+input bool   Hour09_Active = true;      // 09:00 - 09:59 (東京オープン)
+input bool   Hour10_Active = true;      // 10:00 - 10:59 (仲値)
+input bool   Hour11_Active = true;      // 11:00 - 11:59
+input bool   Hour12_Active = true;      // 12:00 - 12:59
+input bool   Hour13_Active = true;      // 13:00 - 13:59
+input bool   Hour14_Active = true;      // 14:00 - 14:59
+input bool   Hour15_Active = true;      // 15:00 - 15:59 (欧州前)
+input bool   Hour16_Active = true;      // 16:00 - 16:59 (ロンドンオープン)
+input bool   Hour17_Active = true;      // 17:00 - 17:59
+input bool   Hour18_Active = true;      // 18:00 - 18:59
+input bool   Hour19_Active = true;      // 19:00 - 19:59
+input bool   Hour20_Active = true;      // 20:00 - 20:59
+input bool   Hour21_Active = true;      // 21:00 - 21:59 (NYオープン)
+input bool   Hour22_Active = true;      // 22:00 - 22:59
+input bool   Hour23_Active = true;      // 23:00 - 23:59
 
 // Global Variables
 int sock = -1;
@@ -44,6 +74,9 @@ double current_fib_618 = 0.0;
 // Forward Declarations
 void UpdateChartHUD(string regime_str, string killswitch_str);
 void UpdateChartFibonacciOverlay();
+bool IsTradingHourAllowed(datetime t);
+bool IsHourActive(int h);
+void CheckTimeoutPositions();
 void CreateOrUpdateRectLabel(string name, int x, int y, int width, int height, color bg_clr, color border_clr);
 void CreateOrUpdateZoneRect(string name, datetime time1, double price1, datetime time2, double price2, color bg_clr);
 void CreateOrUpdateLabel(string name, int x, int y, string text, int font_size, string font_name, color clr);
@@ -60,13 +93,14 @@ void InitSocket();
 void CloseSocket();
 string SendAndReceive(string message);
 void ProcessServerResponse(string json);
+double ParseJsonDouble(string json, string key, double default_val);
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   Print("[RakutenTradeAgent] Initializing EA with Fibonacci, Dow Overlay & Realtime HUD...");
+   Print("[RakutenTradeAgent] Initializing EA v2.1 with Multi-Filter Mean Reversion (BB+RSI+ATR+ADX)...");
    InitSocket();
    if(EnableVisualOverlay)
    {
@@ -101,11 +135,14 @@ void OnTick()
       }
    }
 
+   // タイムベース強制決済判定 (120分経過ポジションをクローズ)
+   CheckTimeoutPositions();
+
    // チャートオーバーレイ＆HUDの定期更新 (1分に1回)
    if(EnableVisualOverlay && TimeCurrent() - last_fib_update >= 60)
    {
       UpdateChartFibonacciOverlay();
-      UpdateChartHUD("STRONG_TREND_BULL (FIB 50-61.8%)", "ACTIVE & READY");
+      UpdateChartHUD("REGIME: CLEAR (RANGE - ENTRY OK)", "ACTIVE & READY");
       last_fib_update = TimeCurrent();
    }
 
@@ -142,7 +179,6 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       if(Bid >= zone_bottom && Ask <= zone_top)
       {
          in_golden_zone = true;
-         // サウンド通知 (5分に1回のみ控えめに鳴動)
          if(TimeCurrent() - last_sound_alert >= 300)
          {
             PlaySound("alert.wav");
@@ -154,26 +190,24 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
 
    string display_regime = regime_str;
    color regime_clr = clrLime;
-   if(in_golden_zone)
-   {
-      display_regime = ">>> IN GOLDEN ZONE (50-61.8%) - WATCH DOW BREAKOUT <<<";
-      regime_clr = clrGold;
-   }
+   if(StringFind(regime_str, "PURPLE") >= 0) regime_clr = C'204,102,255';
+   else if(StringFind(regime_str, "ORANGE") >= 0) regime_clr = clrOrange;
+   else if(StringFind(regime_str, "RED") >= 0) regime_clr = clrCrimson;
 
-   // 1. 半透明ダーク背景パネルの描画 (高さ112pxに拡張)
-   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 450, 112, C'10,15,28', (in_golden_zone ? clrGold : C'34,47,76'));
+   // 1. 半透明ダーク背景パネルの描画
+   CreateOrUpdateRectLabel("RTA_HUD_BG", 10, 12, 450, 115, C'10,15,28', (in_golden_zone ? clrGold : C'34,47,76'));
 
    // 2. HUD テキストの描画
-   CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [FIBONACCI x DOW AI] <<<", 10, "Arial Bold", clrDeepSkyBlue);
-   CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[REGIME] %s", display_regime), 9, "Arial Bold", regime_clr);
+   CreateOrUpdateLabel("RTA_HUD_TITLE", 18, 18, ">>> RAKUTEN QUANT PIPELINE [MULTI-FILTER MEAN REV] <<<", 10, "Arial Bold", clrDeepSkyBlue);
+   CreateOrUpdateLabel("RTA_HUD_REGIME", 18, 35, StringFormat("[4-STATE REGIME] %s", display_regime), 9, "Arial Bold", regime_clr);
    CreateOrUpdateLabel("RTA_HUD_KS", 18, 50, StringFormat("[AI KILL-SWITCH] %s", killswitch_str), 9, "Arial Bold", clrGold);
-   CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, "[RISK MGMT] 2,000 JPY/Trade | SL: Micro-SL (4-8 pips)", 9, "Arial Bold", clrLightCyan);
+   CreateOrUpdateLabel("RTA_HUD_RISK", 18, 65, "[STRATEGY] BB(20,2.0) + RSI(14) + MTF-ATR + ADX | MaxPos: 2", 9, "Arial Bold", clrLightCyan);
 
    // 3. リアルタイム獲得pips・含み損益メーターの計算＆表示
    double pip_size = (Digits == 3 || Digits == 5) ? Point * 10 : Point;
    if(StringFind(Symbol(), "XAU") >= 0 || StringFind(Symbol(), "GOLD") >= 0) pip_size = 0.1;
 
-   bool has_position = false;
+   int open_pos_count = 0;
    double total_pips = 0.0;
    double total_profit = 0.0;
    double active_lot = 0.0;
@@ -185,35 +219,35 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
       {
          if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
          {
-            has_position = true;
+            open_pos_count++;
             active_lot += OrderLots();
             total_profit += (OrderProfit() + OrderSwap());
             if(OrderType() == OP_BUY)
             {
                pos_type = "BUY";
-               total_pips = (Bid - OrderOpenPrice()) / pip_size;
+               total_pips += (Bid - OrderOpenPrice()) / pip_size;
             }
             else if(OrderType() == OP_SELL)
             {
                pos_type = "SELL";
-               total_pips = (OrderOpenPrice() - Ask) / pip_size;
+               total_pips += (OrderOpenPrice() - Ask) / pip_size;
             }
          }
       }
    }
 
-   if(has_position)
+   if(open_pos_count > 0)
    {
       color pnl_clr = (total_profit >= 0) ? clrLime : clrCrimson;
-      string pnl_str = StringFormat("[OPEN PnL] %s %.2fLot | %+0.1f pips (%+0.0f JPY)", pos_type, active_lot, total_pips, total_profit);
+      string pnl_str = StringFormat("[OPEN PnL] %s (%d/%d Pos) %.2fLot | %+0.1f pips (%+0.0f JPY)", pos_type, open_pos_count, PyramiddingMax, active_lot, total_pips, total_profit);
       CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, pnl_str, 9, "Arial Bold", pnl_clr);
    }
    else
    {
-      CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (No Active Position)", 9, "Arial Bold", clrDarkGray);
+      CreateOrUpdateLabel("RTA_HUD_PNL", 18, 80, "[OPEN PnL] STANDBY (0/2 Position)", 9, "Arial Bold", clrDarkGray);
    }
 
-   // 4. 直近トレード履歴（直近3件の損益）の集計＆表示
+   // 4. 直近トレード履歴
    string recent_str = "[RECENT] ";
    int found_count = 0;
    double recent_total = 0.0;
@@ -240,7 +274,7 @@ void UpdateChartHUD(string regime_str, string killswitch_str)
    }
    else
    {
-      CreateOrUpdateLabel("RTA_HUD_RECENT", 18, 96, "[RECENT] No past closed trades today", 8, "Arial", clrSilver);
+      CreateOrUpdateLabel("RTA_HUD_RECENT", 18, 96, "[RECENT] Target PF: 1.30+ | No past closed trades today", 8, "Arial", clrSilver);
    }
 
    // 5. ボタン群の描画
@@ -328,7 +362,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       }
       else if(sparam == "RTA_BTN_LOT_TOGGLE")
       {
-         // 0.10L -> 0.25L -> 0.50L -> 0.10L トグル
          if(current_manual_lot == 0.10) current_manual_lot = 0.25;
          else if(current_manual_lot == 0.25) current_manual_lot = 0.50;
          else current_manual_lot = 0.10;
@@ -342,15 +375,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       }
       else if(sparam == "RTA_BTN_BUY_MANUAL")
       {
-         PrintFormat("[RakutenTradeAgent] 🎯 MANUAL BUY %.2fLot (SL: 4.0pips, TP: 15.0pips) Triggered!", current_manual_lot);
-         ExecuteOrder(OP_BUY, current_manual_lot, 4.0, 15.0);
+         PrintFormat("[RakutenTradeAgent] 🎯 MANUAL BUY %.2fLot Triggered!", current_manual_lot);
+         ExecuteOrder(OP_BUY, current_manual_lot, 15.0, 30.0);
          ObjectSetInteger(0, "RTA_BTN_BUY_MANUAL", OBJPROP_STATE, false);
          ChartRedraw(0);
       }
       else if(sparam == "RTA_BTN_SELL_MANUAL")
       {
-         PrintFormat("[RakutenTradeAgent] 🎯 MANUAL SELL %.2fLot (SL: 4.0pips, TP: 15.0pips) Triggered!", current_manual_lot);
-         ExecuteOrder(OP_SELL, current_manual_lot, 4.0, 15.0);
+         PrintFormat("[RakutenTradeAgent] 🎯 MANUAL SELL %.2fLot Triggered!", current_manual_lot);
+         ExecuteOrder(OP_SELL, current_manual_lot, 15.0, 30.0);
          ObjectSetInteger(0, "RTA_BTN_SELL_MANUAL", OBJPROP_STATE, false);
          ChartRedraw(0);
       }
@@ -377,7 +410,7 @@ void MoveStopLossToBreakEven()
 
             if(OrderType() == OP_BUY)
             {
-               new_sl = open_price + (0.5 * pip_size); // 建値 +0.5pips
+               new_sl = open_price + (0.5 * pip_size);
                if(current_sl < new_sl && Bid > new_sl + (1.0 * pip_size))
                {
                   bool res = OrderModify(OrderTicket(), open_price, new_sl, OrderTakeProfit(), 0, clrLime);
@@ -386,7 +419,7 @@ void MoveStopLossToBreakEven()
             }
             else if(OrderType() == OP_SELL)
             {
-               new_sl = open_price - (0.5 * pip_size); // 建値 -0.5pips
+               new_sl = open_price - (0.5 * pip_size);
                if((current_sl == 0 || current_sl > new_sl) && Ask < new_sl - (1.0 * pip_size))
                {
                   bool res = OrderModify(OrderTicket(), open_price, new_sl, OrderTakeProfit(), 0, clrCrimson);
@@ -418,7 +451,7 @@ void AutoTrailingStop()
             if(OrderType() == OP_BUY)
             {
                double profit_pips = (Bid - open_price) / pip_size;
-               if(profit_pips >= 10.0) // +10pips以上でトレーリング開始
+               if(profit_pips >= 10.0)
                {
                   int lowest_bar = iLowest(Symbol(), 0, MODE_LOW, 3, 1);
                   if(lowest_bar >= 0)
@@ -435,7 +468,7 @@ void AutoTrailingStop()
             else if(OrderType() == OP_SELL)
             {
                double profit_pips = (open_price - Ask) / pip_size;
-               if(profit_pips >= 10.0) // +10pips以上でトレーリング開始
+               if(profit_pips >= 10.0)
                {
                   int highest_bar = iHighest(Symbol(), 0, MODE_HIGH, 3, 1);
                   if(highest_bar >= 0)
@@ -493,7 +526,7 @@ void CreateOrUpdateZoneRect(string name, datetime time1, double price1, datetime
    }
    ObjectSetInteger(0, name, OBJPROP_COLOR, bg_clr);
    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bg_clr);
-   ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景に敷く
+   ObjectSetInteger(0, name, OBJPROP_BACK, true);
    ObjectSetInteger(0, name, OBJPROP_FILL, true);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
@@ -504,7 +537,6 @@ void CreateOrUpdateZoneRect(string name, datetime time1, double price1, datetime
 //+------------------------------------------------------------------+
 void UpdateChartFibonacciOverlay()
 {
-   // 上位足 (H1 / M15) からスイング高安値を自動逆算
    ENUM_TIMEFRAMES htf = FibTimeFrame;
    if(Period() >= PERIOD_H1) htf = PERIOD_CURRENT;
 
@@ -529,17 +561,14 @@ void UpdateChartFibonacciOverlay()
    current_fib_500 = fib_500;
    current_fib_618 = fib_618;
 
-   // 1. フィボナッチ黄金比帯 (50.0%〜61.8%) の半透明ハイライトゾーン描画
-   datetime t_start = TimeCurrent() - (86400 * 5); // 5日前から
-   datetime t_end   = TimeCurrent() + (86400 * 2); // 2日先まで
+   datetime t_start = TimeCurrent() - (86400 * 5);
+   datetime t_end   = TimeCurrent() + (86400 * 2);
    CreateOrUpdateZoneRect("RTA_FIB_GOLDEN_ZONE", t_start, fib_500, t_end, fib_618, C'20,35,55');
 
-   // 2. 38.2% / 50.0% / 61.8% ライン ＆ 価格テキスト
    CreateOrUpdateHLine("RTA_FIB_382", fib_382, clrGold, STYLE_DASH, 1, StringFormat("HTF FR 38.2%% (%.3f)", fib_382));
    CreateOrUpdateHLine("RTA_FIB_500", fib_500, clrDeepSkyBlue, STYLE_SOLID, 2, StringFormat("HTF FR 50.0%% Equilibrium (%.3f)", fib_500));
    CreateOrUpdateHLine("RTA_FIB_618", fib_618, clrOrangeRed, STYLE_SOLID, 2, StringFormat("HTF FR 61.8%% Golden Zone (%.3f)", fib_618));
 
-   // 3. 現在足の直近戻り高値・押し安値 (直近10本)
    int current_bars = iBars(Symbol(), 0);
    int dow_lookback = MathMin(10, current_bars - 2);
    int recent_h_bar = iHighest(Symbol(), 0, MODE_HIGH, dow_lookback, 1);
@@ -569,7 +598,7 @@ void CreateOrUpdateHLine(string name, double price, color clr, int style, int wi
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE, style);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, width);
-   ObjectSetInteger(0, name, OBJPROP_BACK, false); // 前面に表示
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
    ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
@@ -585,7 +614,7 @@ void DrawEntryMarker(int order_type, double price, double sl, double tp, double 
 
    datetime t = TimeCurrent();
    string arrow_name = StringFormat("RTA_ARROW_%d", ticket);
-   int arrow_code = (order_type == OP_BUY) ? 233 : 234; // 233: Up Arrow, 234: Down Arrow
+   int arrow_code = (order_type == OP_BUY) ? 233 : 234;
    color arrow_clr = (order_type == OP_BUY) ? clrLime : clrRed;
 
    ObjectCreate(0, arrow_name, OBJ_ARROW, 0, t, price);
@@ -593,13 +622,11 @@ void DrawEntryMarker(int order_type, double price, double sl, double tp, double 
    ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, arrow_clr);
    ObjectSetInteger(0, arrow_name, OBJPROP_WIDTH, 3);
 
-   // SL / TP 水平ライン
    string sl_name = StringFormat("RTA_SL_%d", ticket);
    string tp_name = StringFormat("RTA_TP_%d", ticket);
    CreateOrUpdateHLine(sl_name, sl, clrCrimson, STYLE_DASH, 1, StringFormat("#%d SL", ticket));
    CreateOrUpdateHLine(tp_name, tp, clrDodgerBlue, STYLE_DASH, 1, StringFormat("#%d TP", ticket));
 
-   // ラベル
    string label_name = StringFormat("RTA_LBL_%d", ticket);
    ObjectCreate(0, label_name, OBJ_TEXT, 0, t, price);
    ObjectSetString(0, label_name, OBJPROP_TEXT, StringFormat(" #%d %s (%.2f Lot)", ticket, (order_type == OP_BUY ? "BUY" : "SELL"), lot));
@@ -629,7 +656,7 @@ void InitSocket()
       return;
    }
 
-   sock = socket(2, 1, 6); // AF_INET=2, SOCK_STREAM=1, IPPROTO_TCP=6
+   sock = socket(2, 1, 6);
    if(sock < 0)
    {
       Print("[RakutenTradeAgent] socket() creation failed");
@@ -644,8 +671,8 @@ void InitSocket()
 
    uchar sockaddr_in[16];
    ArrayInitialize(sockaddr_in, 0);
-   sockaddr_in[0] = 2; // AF_INET low byte
-   sockaddr_in[1] = 0; // AF_INET high byte
+   sockaddr_in[0] = 2;
+   sockaddr_in[1] = 0;
    sockaddr_in[2] = (uchar)(port_net & 0xFF);
    sockaddr_in[3] = (uchar)((port_net >> 8) & 0xFF);
    sockaddr_in[4] = (uchar)(addr & 0xFF);
@@ -735,6 +762,91 @@ double ParseJsonDouble(string json, string key, double default_val)
 }
 
 //+------------------------------------------------------------------+
+//| Check if current hour is allowed for trading (with 59m lookahead)|
+//+------------------------------------------------------------------+
+bool IsTradingHourAllowed(datetime t)
+{
+   if(!EnableHourFilter) return true;
+
+   MqlDateTime dt;
+   TimeToStruct(t, dt);
+   int current_h = dt.hour;
+   int current_m = dt.min;
+
+   // 59分台の次時間先読みロジック: 次の一時間が停止設定なら59分での新規エントリーを禁止
+   if(current_m == 59)
+   {
+      int next_h = (current_h + 1) % 24;
+      if(!IsHourActive(next_h))
+      {
+         PrintFormat("[RakutenTradeAgent] ⏳ 59-min lookahead: Next hour (%02d:00) is INACTIVE. Skipping entry.", next_h);
+         return false;
+      }
+   }
+
+   return IsHourActive(current_h);
+}
+
+bool IsHourActive(int h)
+{
+   switch(h)
+   {
+      case 0: return Hour00_Active;
+      case 1: return Hour01_Active;
+      case 2: return Hour02_Active;
+      case 3: return Hour03_Active;
+      case 4: return Hour04_Active;
+      case 5: return Hour05_Active;
+      case 6: return Hour06_Active;
+      case 7: return Hour07_Active;
+      case 8: return Hour08_Active;
+      case 9: return Hour09_Active;
+      case 10: return Hour10_Active;
+      case 11: return Hour11_Active;
+      case 12: return Hour12_Active;
+      case 13: return Hour13_Active;
+      case 14: return Hour14_Active;
+      case 15: return Hour15_Active;
+      case 16: return Hour16_Active;
+      case 17: return Hour17_Active;
+      case 18: return Hour18_Active;
+      case 19: return Hour19_Active;
+      case 20: return Hour20_Active;
+      case 21: return Hour21_Active;
+      case 22: return Hour22_Active;
+      case 23: return Hour23_Active;
+   }
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Time-based Stagnant Capital Exit (タイムベース強制決済)         |
+//+------------------------------------------------------------------+
+void CheckTimeoutPositions()
+{
+   if(TimeoutMinutes <= 0) return;
+
+   datetime now = TimeCurrent();
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
+         {
+            int elapsed_min = (int)((now - OrderOpenTime()) / 60);
+            if(elapsed_min >= TimeoutMinutes)
+            {
+               PrintFormat("[RakutenTradeAgent] ⏰ TIMEOUT EXIT: Order #%d reached timeout (%d >= %d min). Closing position.",
+                  OrderTicket(), elapsed_min, TimeoutMinutes);
+               double close_price = (OrderType() == OP_BUY) ? Bid : Ask;
+               OrderClose(OrderTicket(), OrderLots(), close_price, Slippage, clrOrange);
+            }
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Process Gateway Signal JSON                                     |
 //+------------------------------------------------------------------+
 void ProcessServerResponse(string json)
@@ -758,29 +870,54 @@ void ProcessServerResponse(string json)
 }
 
 //+------------------------------------------------------------------+
-//| Execute Order with Dynamic ATR SL/TP & Sizing                   |
+//| Execute Order with Reverse (土転) & Pyramidding (最大2)         |
 //+------------------------------------------------------------------+
 void ExecuteOrder(int order_type, double lot, double sl_pips, double tp_pips)
 {
    if(!EnableAutoTrade) return;
+   if(!IsTradingHourAllowed(TimeCurrent())) return;
 
-   // Check if already in position for this MagicNumber
+   int same_dir_count = 0;
+   int opp_dir_count = 0;
+
    for(int i = OrdersTotal() - 1; i >= 0; i--)
    {
       if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
       {
          if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
          {
-            return; // 既にポジション保有中のため見送り
+            if(OrderType() == order_type)
+            {
+               same_dir_count++;
+            }
+            else
+            {
+               opp_dir_count++;
+            }
          }
       }
+   }
+
+   // 1. 土転 (Reverse): 反対方向ポジションを保有している場合は即時全決済
+   if(opp_dir_count > 0)
+   {
+      PrintFormat("[RakutenTradeAgent] 🔄 REVERSE EXECUTION: Opposing positions (%d) detected. Closing for reverse entry.", opp_dir_count);
+      CloseAllPositions();
+      Sleep(200);
+   }
+
+   // 2. ピラミッティング上限チェック (最大 PyramiddingMax)
+   if(same_dir_count >= PyramiddingMax)
+   {
+      PrintFormat("[RakutenTradeAgent] ℹ️ Pyramidding limit reached (%d >= %d). Skipping additional entry.", same_dir_count, PyramiddingMax);
+      return;
    }
 
    double price = (order_type == OP_BUY) ? Ask : Bid;
    double pip_size = (Digits == 3 || Digits == 5) ? Point * 10 : Point;
    if(StringFind(Symbol(), "XAU") >= 0 || StringFind(Symbol(), "GOLD") >= 0)
    {
-      pip_size = 0.1; // ゴールド対応
+      pip_size = 0.1;
    }
 
    double sl = 0;
@@ -797,30 +934,27 @@ void ExecuteOrder(int order_type, double lot, double sl_pips, double tp_pips)
       tp = price - (tp_pips * pip_size);
    }
 
-   // ロットの丸め
    lot = MathMax(MarketInfo(Symbol(), MODE_MINLOT), MathMin(MarketInfo(Symbol(), MODE_MAXLOT), lot));
 
    color clr = (order_type == OP_BUY) ? clrBlue : clrRed;
-   int ticket = OrderSend(Symbol(), order_type, lot, price, Slippage, sl, tp, "GatewayATRAuto", MagicNumber, 0, clr);
+   string order_tag = (same_dir_count > 0) ? "MeanRev_Pyramid" : "MeanRev_Auto";
+   int ticket = OrderSend(Symbol(), order_type, lot, price, Slippage, sl, tp, order_tag, MagicNumber, 0, clr);
 
    if(ticket > 0)
    {
-      PrintFormat("[RakutenTradeAgent] 🎯 Order executed: Ticket #%d, %s, Lot: %.2f, Price: %.5f, SL: %.5f (%.1f pips), TP: %.5f (%.1f pips)",
-         ticket, (order_type == OP_BUY ? "BUY" : "SELL"), lot, price, sl, sl_pips, tp, tp_pips
+      PrintFormat("[RakutenTradeAgent] 🎯 Order executed: Ticket #%d, %s, Lot: %.2f, Price: %.5f, SL: %.5f (%.1f pips), TP: %.5f (%.1f pips), Pyramidding: %d/%d",
+         ticket, (order_type == OP_BUY ? "BUY" : "SELL"), lot, price, sl, sl_pips, tp, tp_pips, same_dir_count + 1, PyramiddingMax
       );
       
-      // チャート上にエントリーマークとSL/TPを描画
       DrawEntryMarker(order_type, price, sl, tp, lot, ticket);
 
-      // マルチモーダルAI評価用: エントリー瞬間のチャート画像を自動保存
       string shot_file = StringFormat("trades\\ticket_%d.png", ticket);
       if(WindowScreenShot(shot_file, 1280, 720))
       {
          PrintFormat("[RakutenTradeAgent] 📸 Saved entry chart screenshot to MQL4/Files/%s", shot_file);
       }
 
-      // オープン約定ログを送信 (スクリーンショットパスをコメントに付与)
-      string comment_str = StringFormat("AutoOrder_FibDow_%s", shot_file);
+      string comment_str = StringFormat("MeanRev_%s_%s", order_tag, shot_file);
       string trade_json = StringFormat(
          "{\"type\":\"TRADE_LOG\",\"ticket\":%d,\"symbol\":\"%s\",\"action\":\"%s\",\"lots\":%.2f,\"open_price\":%.5f,\"open_time\":\"%s\",\"profit\":0.0,\"comment\":\"%s\"}\n",
          ticket, Symbol(), (order_type == OP_BUY ? "BUY" : "SELL"), lot, price, TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS), comment_str
@@ -870,7 +1004,6 @@ void CheckClosedOrders()
       {
          if(OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol())
          {
-            // 直近5分以内にクローズされた注文を通知
             if(TimeCurrent() - OrderCloseTime() < 300)
             {
                string action = (OrderType() == OP_BUY ? "BUY" : "SELL");

@@ -93,6 +93,49 @@ body {
     gap: 12px;
 }
 
+.regime-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    border: 1px solid var(--border-subtle);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.regime-badge.state-purple { color: #cc66ff; border-color: #cc66ff; background: rgba(204, 102, 255, 0.15); }
+.regime-badge.state-orange { color: var(--accent-orange); border-color: var(--accent-orange); background: rgba(255, 119, 0, 0.15); }
+.regime-badge.state-red { color: var(--accent-red); border-color: var(--accent-red); background: rgba(255, 51, 68, 0.15); }
+.regime-badge.state-clear { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0, 255, 136, 0.15); }
+
+.regime-state-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.state-pill {
+    flex: 1;
+    text-align: center;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+}
+
+.state-pill.state-purple.active { color: #cc66ff; border-color: #cc66ff; background: rgba(204, 102, 255, 0.2); box-shadow: 0 0 10px rgba(204, 102, 255, 0.4); }
+.state-pill.state-orange.active { color: var(--accent-orange); border-color: var(--accent-orange); background: rgba(255, 119, 0, 0.2); box-shadow: 0 0 10px rgba(255, 119, 0, 0.4); }
+.state-pill.state-red.active { color: var(--accent-red); border-color: var(--accent-red); background: rgba(255, 51, 68, 0.2); box-shadow: 0 0 10px rgba(255, 51, 68, 0.4); }
+.state-pill.state-clear.active { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0, 255, 136, 0.2); box-shadow: 0 0 10px rgba(0, 255, 136, 0.4); }
+
 .status-badge {
     display: flex;
     align-items: center;

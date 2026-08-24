@@ -48,6 +48,7 @@ func SetupRouter(h *Handler, staticFS embed.FS) *gin.Engine {
 		api.GET("/metrics", h.GetMetrics)
 		api.GET("/trades", h.GetTrades)
 		api.GET("/signals", h.GetSignals)
+		api.GET("/regime", h.GetMarketRegime)
 		api.POST("/ai/evaluate", h.GenerateAiReport)
 		api.POST("/kill-switch", h.ToggleKillSwitch)
 	}
