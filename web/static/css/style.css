@@ -544,6 +544,165 @@ body {
     font-weight: 700;
 }
 
+/* Navigation Tabs */
+.hud-nav-tabs {
+    display: flex;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+}
+
+.nav-tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-tab-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab-btn.active {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(255, 0, 128, 0.2));
+    color: var(--text-highlight);
+    border: 1px solid var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+.tab-view {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.tab-view.active {
+    display: flex;
+}
+
+/* Backtest Controls */
+.backtest-controls {
+    padding: 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.control-title h2 {
+    font-size: 16px;
+    color: var(--accent-cyan);
+    margin: 0 0 4px 0;
+}
+
+.control-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.control-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.action-btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.run-btn {
+    background: linear-gradient(135deg, #00f0ff, #0088ff);
+    color: #060913;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+}
+
+.run-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+}
+
+.optimize-btn {
+    background: linear-gradient(135deg, #ff0080, #7928ca);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(255, 0, 128, 0.4);
+}
+
+.optimize-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 18px rgba(255, 0, 128, 0.6);
+}
+
+.export-btn {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+    border-color: var(--border-subtle);
+}
+
+.export-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-highlight);
+}
+
+/* Parameters Tuning Strip */
+.params-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 12px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+}
+
+.param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.param-item label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+}
+
+.param-item label span {
+    color: var(--accent-gold);
+    font-weight: 700;
+}
+
+.param-item input[type="range"] {
+    accent-color: var(--accent-cyan);
+    cursor: pointer;
+}
+
+/* Small Table */
+.small-table th, .small-table td {
+    padding: 8px 10px;
+    font-size: 11px;
+}
+
 /* Footer */
 .hud-footer {
     display: flex;

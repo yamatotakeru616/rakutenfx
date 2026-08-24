@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rakuten FX Pro Trader Cockpit - Multi-Filter Mean Reversion Engine</title>
+    <title>Rakuten FX Pro Trader Cockpit - Multi-Filter Mean Reversion & 1-Year Backtest Engine</title>
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,11 +24,21 @@
                 </div>
             </div>
 
+            <!-- Tab Switcher -->
+            <div class="hud-nav-tabs">
+                <button class="nav-tab-btn active" id="tab-btn-live" onclick="switchTab('live')">
+                    🔴 LIVE MONITORING
+                </button>
+                <button class="nav-tab-btn" id="tab-btn-backtest" onclick="switchTab('backtest')">
+                    📊 1-YEAR BACKTEST & OPTIMIZER
+                </button>
+            </div>
+
             <div class="hud-status-panel">
                 <!-- 4-State Market Regime Badge -->
                 <div class="regime-badge state-clear" id="hud-regime-badge">
                     <span class="pulse-dot green" id="regime-dot"></span>
-                    <span id="regime-status-text">REGIME: CLEAR (RANGE)</span>
+                    <span id="regime-status-text">REGIME: CLEAR</span>
                 </div>
                 <div class="status-badge gateway-badge">
                     <span class="pulse-dot green"></span>
@@ -38,171 +48,368 @@
                     <span>KILL-SWITCH: NORMAL</span>
                 </div>
                 <button class="kill-switch-btn" id="kill-switch-btn" onclick="toggleKillSwitch()">
-                    🚨 EMERGENCY KILL
+                    🚨 KILL
                 </button>
             </div>
         </header>
 
-        <!-- KPI Metrics Ribbon -->
-        <section class="kpi-grid">
-            <div class="kpi-card glow-cyan">
-                <div class="kpi-header">
-                    <span class="kpi-title">NET PROFIT (総損益)</span>
-                    <span class="kpi-icon">💰</span>
-                </div>
-                <div class="kpi-value highlight-green" id="kpi-total-profit">+¥0</div>
-                <div class="kpi-meta">
-                    <span>総利益: <strong id="kpi-gross-profit">¥0</strong></span>
-                    <span>総損失: <strong id="kpi-gross-loss">¥0</strong></span>
-                </div>
-            </div>
-
-            <div class="kpi-card glow-magenta">
-                <div class="kpi-header">
-                    <span class="kpi-title">WIN RATE (勝率)</span>
-                    <span class="kpi-icon">🎯</span>
-                </div>
-                <div class="kpi-value highlight-cyan" id="kpi-win-rate">0.0%</div>
-                <div class="kpi-meta">
-                    <span id="kpi-trades-count">0戦 0勝 0敗</span>
-                    <span>連勝: <strong id="kpi-consecutive-wins">0</strong></span>
-                </div>
-            </div>
-
-            <div class="kpi-card glow-gold">
-                <div class="kpi-header">
-                    <span class="kpi-title">PROFIT FACTOR (目標 1.30+)</span>
-                    <span class="kpi-icon">📈</span>
-                </div>
-                <div class="kpi-value highlight-gold" id="kpi-profit-factor">0.00</div>
-                <div class="kpi-meta">
-                    <span>平均利益: <strong id="kpi-avg-profit">¥0</strong></span>
-                    <span>最大勝: <strong id="kpi-largest-win">¥0</strong></span>
-                </div>
-            </div>
-
-            <div class="kpi-card glow-orange">
-                <div class="kpi-header">
-                    <span class="kpi-title">MAX DRAWDOWN</span>
-                    <span class="kpi-icon">🛡️</span>
-                </div>
-                <div class="kpi-value highlight-orange" id="kpi-max-drawdown">¥0 (0.0%)</div>
-                <div class="kpi-meta">
-                    <span>推奨ロット: <strong id="kpi-recommended-lot" class="lot-pill">0.25 Lot</strong></span>
-                    <span>最大敗: <strong id="kpi-largest-loss">¥0</strong></span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Main Dashboard Split Grid -->
-        <main class="dashboard-main-grid">
-            <!-- Left: Equity Curve Chart & 4-State Filter Subpanel -->
-            <section class="chart-section glass-panel">
-                <div class="panel-header">
-                    <h2>📈 EQUITY CURVE & PERFORMANCE ACCUMULATION</h2>
-                    <span class="refresh-indicator" id="chart-refresh-status">Real-time sync</span>
-                </div>
-                <div class="chart-container">
-                    <canvas id="equityChart"></canvas>
+        <!-- ========================================================================= -->
+        <!-- TAB 1: LIVE MONITORING VIEW                                              -->
+        <!-- ========================================================================= -->
+        <div id="view-live" class="tab-view active">
+            <!-- KPI Metrics Ribbon -->
+            <section class="kpi-grid">
+                <div class="kpi-card glow-cyan">
+                    <div class="kpi-header">
+                        <span class="kpi-title">NET PROFIT (総損益)</span>
+                        <span class="kpi-icon">💰</span>
+                    </div>
+                    <div class="kpi-value highlight-green" id="kpi-total-profit">+¥0</div>
+                    <div class="kpi-meta">
+                        <span>総利益: <strong id="kpi-gross-profit">¥0</strong></span>
+                        <span>総損失: <strong id="kpi-gross-loss">¥0</strong></span>
+                    </div>
                 </div>
 
-                <!-- 4-State Multi-Filter & Strategy Signals Subpanel -->
-                <div class="signals-subpanel">
+                <div class="kpi-card glow-magenta">
+                    <div class="kpi-header">
+                        <span class="kpi-title">WIN RATE (勝率)</span>
+                        <span class="kpi-icon">🎯</span>
+                    </div>
+                    <div class="kpi-value highlight-cyan" id="kpi-win-rate">0.0%</div>
+                    <div class="kpi-meta">
+                        <span id="kpi-trades-count">0戦 0勝 0敗</span>
+                        <span>連勝: <strong id="kpi-consecutive-wins">0</strong></span>
+                    </div>
+                </div>
+
+                <div class="kpi-card glow-gold">
+                    <div class="kpi-header">
+                        <span class="kpi-title">PROFIT FACTOR (目標 1.30+)</span>
+                        <span class="kpi-icon">📈</span>
+                    </div>
+                    <div class="kpi-value highlight-gold" id="kpi-profit-factor">0.00</div>
+                    <div class="kpi-meta">
+                        <span>平均利益: <strong id="kpi-avg-profit">¥0</strong></span>
+                        <span>最大勝: <strong id="kpi-largest-win">¥0</strong></span>
+                    </div>
+                </div>
+
+                <div class="kpi-card glow-orange">
+                    <div class="kpi-header">
+                        <span class="kpi-title">MAX DRAWDOWN</span>
+                        <span class="kpi-icon">🛡️</span>
+                    </div>
+                    <div class="kpi-value highlight-orange" id="kpi-max-drawdown">¥0 (0.0%)</div>
+                    <div class="kpi-meta">
+                        <span>推奨ロット: <strong id="kpi-recommended-lot" class="lot-pill">0.25 Lot</strong></span>
+                        <span>最大敗: <strong id="kpi-largest-loss">¥0</strong></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main Dashboard Split Grid -->
+            <main class="dashboard-main-grid">
+                <!-- Left: Equity Curve Chart & 4-State Filter Subpanel -->
+                <section class="chart-section glass-panel">
                     <div class="panel-header">
-                        <h3>⚡ 4-STATE MULTI-FILTER & REVERSE / PYRAMIDDING SIGNALS</h3>
-                        <button class="small-btn" onclick="fetchSignals(); fetchRegime();">Refresh</button>
+                        <h2>📈 LIVE EQUITY CURVE & PERFORMANCE ACCUMULATION</h2>
+                        <span class="refresh-indicator" id="chart-refresh-status">Real-time sync</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="equityChart"></canvas>
                     </div>
 
-                    <!-- 4-State Visual Indicator Bar -->
-                    <div class="regime-state-bar" id="regime-state-bar">
-                        <div class="state-pill state-purple" title="ATR高 + ADX強 (二重フィルター)">● PURPLE (ATR+ADX)</div>
-                        <div class="state-pill state-orange" title="ATR高のみ (異常ボラティリティ)">● ORANGE (ATR SPIKE)</div>
-                        <div class="state-pill state-red" title="ADX強のみ (強トレンド警戒)">● RED (TREND ADX)</div>
-                        <div class="state-pill state-clear active" title="フィルター未作動 (エントリー許可)">● CLEAR (ENTRY OK)</div>
+                    <!-- 4-State Multi-Filter & Strategy Signals Subpanel -->
+                    <div class="signals-subpanel">
+                        <div class="panel-header">
+                            <h3>⚡ 4-STATE MULTI-FILTER & REVERSE / PYRAMIDDING SIGNALS</h3>
+                            <button class="small-btn" onclick="fetchSignals(); fetchRegime();">Refresh</button>
+                        </div>
+
+                        <!-- 4-State Visual Indicator Bar -->
+                        <div class="regime-state-bar" id="regime-state-bar">
+                            <div class="state-pill state-purple" title="ATR高 + ADX強 (二重フィルター)">● PURPLE (ATR+ADX)</div>
+                            <div class="state-pill state-orange" title="ATR高のみ (異常ボラティリティ)">● ORANGE (ATR SPIKE)</div>
+                            <div class="state-pill state-red" title="ADX強のみ (強トレンド警戒)">● RED (TREND ADX)</div>
+                            <div class="state-pill state-clear active" title="フィルター未作動 (エントリー許可)">● CLEAR (ENTRY OK)</div>
+                        </div>
+
+                        <div class="signals-list" id="signals-list">
+                            <!-- Signals rendered by JS -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right: Gemini AI Chief Analyst & 4-State Regime Reflection -->
+                <section class="ai-analyst-section glass-panel">
+                    <div class="panel-header">
+                        <h2>🤖 GEMINI AI QUANT CHIEF ANALYST</h2>
+                        <button class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
+                            ✨ RUN AI DIAGNOSIS
+                        </button>
                     </div>
 
-                    <div class="signals-list" id="signals-list">
-                        <!-- Signals rendered by JS -->
-                    </div>
-                </div>
-            </section>
+                    <div class="ai-report-body" id="ai-report-body">
+                        <div class="ai-rank-card">
+                            <div class="rank-circle" id="ai-overall-rank">S</div>
+                            <div class="rank-details">
+                                <h4 id="ai-report-title">AI Performance Review Engine Ready</h4>
+                                <p id="ai-report-summary">Gemini 2.5 Flash が BB+RSI 平均回帰・多層フィルター（ATR/ADX）・PF 1.3 目標達成度を総合評価します。</p>
+                            </div>
+                        </div>
 
-            <!-- Right: Gemini AI Chief Analyst & 4-State Regime Reflection -->
-            <section class="ai-analyst-section glass-panel">
+                        <div class="ai-points-container">
+                            <div class="point-box strengths">
+                                <h4>✅ 検出された強み (Strengths)</h4>
+                                <ul id="ai-strengths-list">
+                                    <li>BB(20, 2.0σ) + RSI(14) のAND条件によるバンドウォーク回避</li>
+                                    <li>MTF-ATR異常ボラティリティ時の安全自動停止</li>
+                                </ul>
+                            </div>
+
+                            <div class="point-box weaknesses">
+                                <h4>⚠️ 改善課題 & アクションプラン (Action Plan)</h4>
+                                <ul id="ai-weaknesses-list">
+                                    <li>土転 (Reverse) ＆ ピラミッティング (最大2) の確実な遂行</li>
+                                    <li>タイムベース強制決済 (120分) による資金拘束リスク排除</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="ai-raw-text-container">
+                            <h4>📝 詳細講評・クオンツメモ</h4>
+                            <pre id="ai-raw-report">AI診断を実行すると詳細なプロアナリスト講評がここに表示されます...</pre>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- Bottom: Closed Trades Ledger -->
+            <section class="trades-ledger glass-panel">
                 <div class="panel-header">
-                    <h2>🤖 GEMINI AI QUANT CHIEF ANALYST</h2>
-                    <button class="ai-eval-btn" id="ai-eval-btn" onclick="runAiEvaluation()">
-                        ✨ RUN AI DIAGNOSIS
-                    </button>
+                    <h2>📑 CLOSED TRADES LEDGER (SQLite WAL Data)</h2>
+                    <span class="record-counter" id="trades-counter">Showing 0 trades</span>
+                </div>
+                <div class="table-wrapper">
+                    <table class="hud-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Symbol</th>
+                                <th>Action</th>
+                                <th>Lots</th>
+                                <th>Open Price</th>
+                                <th>Close Price</th>
+                                <th>Open Time</th>
+                                <th>Close Time</th>
+                                <th>Profit</th>
+                                <th>Strategy Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 2: 1-YEAR BACKTEST & GRID OPTIMIZER VIEW                             -->
+        <!-- ========================================================================= -->
+        <div id="view-backtest" class="tab-view">
+            <!-- Backtest Control Bar -->
+            <section class="backtest-controls glass-panel">
+                <div class="control-header">
+                    <div class="control-title">
+                        <h2>⚙️ USD/JPY 過去1年間 バックテスト ＆ グリッド最適化エンジン</h2>
+                        <span class="control-desc">M1足 37万本 ＆ 4ステート相場レジーム (Purple/Orange/Red/Clear) / 120分タイムアウト / 土転 / ピラミッティング2</span>
+                    </div>
+                    <div class="control-actions">
+                        <button class="action-btn run-btn" id="btn-run-backtest" onclick="runOneYearBacktest()">
+                            🚀 1年バックテスト実行
+                        </button>
+                        <button class="action-btn optimize-btn" id="btn-optimize-backtest" onclick="runGridOptimization()">
+                            ⚡ グリッド最適化 (PF探索)
+                        </button>
+                        <button class="action-btn export-btn" onclick="exportBacktestCsv()">
+                            📥 CSVエクスポート
+                        </button>
+                    </div>
                 </div>
 
-                <div class="ai-report-body" id="ai-report-body">
-                    <div class="ai-rank-card">
-                        <div class="rank-circle" id="ai-overall-rank">S</div>
-                        <div class="rank-details">
-                            <h4 id="ai-report-title">AI Performance Review Engine Ready</h4>
-                            <p id="ai-report-summary">Gemini 2.5 Flash が BB+RSI 平均回帰・多層フィルター（ATR/ADX）・PF 1.3 目標達成度を総合評価します。</p>
-                        </div>
+                <!-- Parameters Tuning Strip -->
+                <div class="params-strip">
+                    <div class="param-item">
+                        <label>BB StdDev (σ): <span id="val-bb-std">2.0</span></label>
+                        <input type="range" id="param-bb-std" min="1.5" max="3.0" step="0.1" value="2.0" oninput="document.getElementById('val-bb-std').textContent=this.value">
                     </div>
-
-                    <div class="ai-points-container">
-                        <div class="point-box strengths">
-                            <h4>✅ 検出された強み (Strengths)</h4>
-                            <ul id="ai-strengths-list">
-                                <li>BB(20, 2.0σ) + RSI(14) のAND条件によるバンドウォーク回避</li>
-                                <li>MTF-ATR異常ボラティリティ時の安全自動停止</li>
-                            </ul>
-                        </div>
-
-                        <div class="point-box weaknesses">
-                            <h4>⚠️ 改善課題 & アクションプラン (Action Plan)</h4>
-                            <ul id="ai-weaknesses-list">
-                                <li>土転 (Reverse) ＆ ピラミッティング (最大2) の確実な遂行</li>
-                                <li>タイムベース強制決済 (120分) による資金拘束リスク排除</li>
-                            </ul>
-                        </div>
+                    <div class="param-item">
+                        <label>RSI Oversold / Overbought: <span id="val-rsi">30 / 70</span></label>
+                        <input type="range" id="param-rsi" min="20" max="40" step="5" value="30" oninput="document.getElementById('val-rsi').textContent=this.value+' / '+(100-this.value)">
                     </div>
-
-                    <div class="ai-raw-text-container">
-                        <h4>📝 詳細講評・クオンツメモ</h4>
-                        <pre id="ai-raw-report">AI診断を実行すると詳細なプロアナリスト講評がここに表示されます...</pre>
+                    <div class="param-item">
+                        <label>ADX Threshold: <span id="val-adx">25</span></label>
+                        <input type="range" id="param-adx" min="15" max="35" step="1" value="25" oninput="document.getElementById('val-adx').textContent=this.value">
+                    </div>
+                    <div class="param-item">
+                        <label>ATR Factor: <span id="val-atr">1.5x</span></label>
+                        <input type="range" id="param-atr" min="1.0" max="2.5" step="0.1" value="1.5" oninput="document.getElementById('val-atr').textContent=this.value+'x'">
+                    </div>
+                    <div class="param-item">
+                        <label>Timeout (min): <span id="val-timeout">120</span></label>
+                        <input type="range" id="param-timeout" min="30" max="240" step="30" value="120" oninput="document.getElementById('val-timeout').textContent=this.value">
                     </div>
                 </div>
             </section>
-        </main>
 
-        <!-- Bottom: Closed Trades Ledger -->
-        <section class="trades-ledger glass-panel">
-            <div class="panel-header">
-                <h2>📑 CLOSED TRADES LEDGER (SQLite WAL Data)</h2>
-                <span class="record-counter" id="trades-counter">Showing 0 trades</span>
-            </div>
-            <div class="table-wrapper">
-                <table class="hud-table">
-                    <thead>
-                        <tr>
-                            <th>Ticket</th>
-                            <th>Symbol</th>
-                            <th>Action</th>
-                            <th>Lots</th>
-                            <th>Open Price</th>
-                            <th>Close Price</th>
-                            <th>Open Time</th>
-                            <th>Close Time</th>
-                            <th>Profit</th>
-                            <th>Strategy Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody id="trades-table-body">
-                        <!-- Filled by JS -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
+            <!-- Backtest KPI Ribbon -->
+            <section class="kpi-grid">
+                <div class="kpi-card glow-cyan">
+                    <div class="kpi-header">
+                        <span class="kpi-title">1-YEAR NET PROFIT</span>
+                        <span class="kpi-icon">💰</span>
+                    </div>
+                    <div class="kpi-value highlight-green" id="bt-kpi-profit">+¥0</div>
+                    <div class="kpi-meta">
+                        <span>総利益: <strong id="bt-kpi-gross-profit">¥0</strong></span>
+                        <span>総損失: <strong id="bt-kpi-gross-loss">¥0</strong></span>
+                    </div>
+                </div>
+
+                <div class="kpi-card glow-magenta">
+                    <div class="kpi-header">
+                        <span class="kpi-title">1-YEAR WIN RATE</span>
+                        <span class="kpi-icon">🎯</span>
+                    </div>
+                    <div class="kpi-value highlight-cyan" id="bt-kpi-win-rate">0.0%</div>
+                    <div class="kpi-meta">
+                        <span id="bt-kpi-trades-count">0戦 0勝 0敗</span>
+                        <span>平均損益: <strong id="bt-kpi-avg-profit">¥0</strong></span>
+                    </div>
+                </div>
+
+                <div class="kpi-card glow-gold">
+                    <div class="kpi-header">
+                        <span class="kpi-title">PROFIT FACTOR (目標 1.30+)</span>
+                        <span class="kpi-icon">📈</span>
+                    </div>
+                    <div class="kpi-value highlight-gold" id="bt-kpi-pf">0.00</div>
+                    <div class="kpi-meta">
+                        <span>最大勝トレード: <strong id="bt-kpi-largest-win">¥0</strong></span>
+                        <span>最大敗トレード: <strong id="bt-kpi-largest-loss">¥0</strong></span>
+                    </div>
+                </div>
+
+                <div class="kpi-card glow-orange">
+                    <div class="kpi-header">
+                        <span class="kpi-title">MAX DRAWDOWN</span>
+                        <span class="kpi-icon">🛡️</span>
+                    </div>
+                    <div class="kpi-value highlight-orange" id="bt-kpi-max-dd">¥0 (0.0%)</div>
+                    <div class="kpi-meta">
+                        <span>シャープレシオ: <strong id="bt-kpi-sharpe">1.68</strong></span>
+                        <span>検証日数: <strong id="bt-kpi-days">365日</strong></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Backtest Main Visual Split -->
+            <main class="dashboard-main-grid">
+                <!-- Left: 1-Year Equity Curve & Monthly Bars -->
+                <section class="chart-section glass-panel">
+                    <div class="panel-header">
+                        <h2>📈 1-YEAR EQUITY GROWTH CURVE (USD/JPY 370,000 M1 Ticks)</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="backtestEquityChart"></canvas>
+                    </div>
+
+                    <!-- Monthly PnL Breakdown Bar Chart -->
+                    <div class="signals-subpanel">
+                        <div class="panel-header">
+                            <h3>📅 MONTHLY PROFIT / LOSS BREAKDOWN</h3>
+                        </div>
+                        <div class="monthly-chart-container" style="height: 180px; position: relative;">
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right: Gemini AI 1-Year Audit & Grid Search Top Rankings -->
+                <section class="ai-analyst-section glass-panel">
+                    <div class="panel-header">
+                        <h2>🤖 GEMINI 2.5 FLASH 1-YEAR QUANT AUDIT</h2>
+                    </div>
+
+                    <div class="ai-report-body">
+                        <div class="ai-rank-card">
+                            <div class="rank-circle" id="bt-ai-rank">S</div>
+                            <div class="rank-details">
+                                <h4 id="bt-ai-title">1-Year Historical Backtest Audit Ready</h4>
+                                <p id="bt-ai-summary">「1年バックテスト実行」を押すと、Gemini 2.5 Flash が 1年間の多層フィルター有効性とPF 1.30目標達成度を自動診断します。</p>
+                            </div>
+                        </div>
+
+                        <div class="ai-points-container">
+                            <div class="point-box strengths">
+                                <h4>✅ 検出された年間優位性 (Strengths)</h4>
+                                <ul id="bt-ai-strengths">
+                                    <li>BB(20, 2.0σ) + RSI(14) の統計的平均回帰エッジ</li>
+                                    <li>4ステート相場レジームによるバンドウォーク完全遮断</li>
+                                    <li>120分タイムベース強制決済による資金拘束排除</li>
+                                </ul>
+                            </div>
+
+                            <div class="point-box weaknesses">
+                                <h4>⚠️ 最適化改善提案 (Action Plan)</h4>
+                                <ul id="bt-ai-weaknesses">
+                                    <li>グリッド最適化による最高PF設定の適用</li>
+                                    <li>ロンドン・NY時間オープン時の動的ATR管理</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Top Grid Search Ranking Table -->
+                        <div class="grid-ranking-container">
+                            <div class="panel-header">
+                                <h3>🏆 TOP HYPERPARAMETER CONFIGURATIONS (Grid Search)</h3>
+                            </div>
+                            <div class="table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                                <table class="hud-table small-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>PF</th>
+                                            <th>WinRate</th>
+                                            <th>Net Profit</th>
+                                            <th>MaxDD</th>
+                                            <th>Trades</th>
+                                            <th>BB σ</th>
+                                            <th>RSI</th>
+                                            <th>ADX</th>
+                                            <th>Timeout</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="grid-ranking-tbody">
+                                        <tr>
+                                            <td colspan="10" style="text-align: center; color: var(--text-muted);">
+                                                「グリッド最適化」を実行すると上位ランキングが表示されます
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
 
         <!-- Footer -->
         <footer class="hud-footer">
-            <span>RAKUTEN FX QUANT COCKPIT v2.1 // MULTI-FILTER MEAN REVERSION (BB+RSI+ATR+ADX)</span>
+            <span>RAKUTEN FX QUANT COCKPIT v2.2 // MULTI-FILTER MEAN REVERSION & 1-YEAR BACKTEST ENGINE</span>
             <span>TCP PORT: 5555 (Rust) / 5556 (Go IPC) / 8080 (REST + WS)</span>
         </footer>
     </div>

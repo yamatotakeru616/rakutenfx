@@ -51,6 +51,11 @@ func SetupRouter(h *Handler, staticFS embed.FS) *gin.Engine {
 		api.GET("/regime", h.GetMarketRegime)
 		api.POST("/ai/evaluate", h.GenerateAiReport)
 		api.POST("/kill-switch", h.ToggleKillSwitch)
+
+		// Backtest & Optimization Endpoints
+		api.POST("/backtest/run", h.RunBacktest)
+		api.POST("/backtest/optimize", h.OptimizeBacktest)
+		api.GET("/backtest/export", h.ExportBacktestCSV)
 	}
 
 	// WebSocket endpoint
