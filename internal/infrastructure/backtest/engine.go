@@ -8,70 +8,82 @@ import (
 
 // StrategyParams holds configurable hyperparameters for backtesting
 type StrategyParams struct {
-	BBPeriod       int     `json:"bb_period"`        // e.g. 20
-	BBStdDev       float64 `json:"bb_std_dev"`       // e.g. 2.0
-	RSIPeriod      int     `json:"rsi_period"`       // e.g. 14
-	RSIOversold    float64 `json:"rsi_oversold"`     // e.g. 30.0
-	RSIOverbought  float64 `json:"rsi_overbought"`   // e.g. 70.0
-	ADXPeriod      int     `json:"adx_period"`       // e.g. 14
-	ADXThreshold   float64 `json:"adx_threshold"`    // e.g. 25.0
-	ATRLookback    int     `json:"atr_lookback"`     // e.g. 50
-	ATRFactor      float64 `json:"atr_factor"`       // e.g. 1.5
-	PyramiddingMax int     `json:"pyramidding_max"`  // e.g. 2
-	TimeoutMinutes int     `json:"timeout_minutes"`  // e.g. 120
-	LotSize        float64 `json:"lot_size"`         // e.g. 0.25 (25,000 currency units)
-	StopLossPips       float64 `json:"stop_loss_pips"`       // e.g. 10.0
-	TakeProfitPips     float64 `json:"take_profit_pips"`     // e.g. 20.0 (RR 1:2.0)
-	SpreadPips         float64 `json:"spread_pips"`          // e.g. 0.2
-	EnableHourFilter   bool    `json:"enable_hour_filter"`   // e.g. true
-	StartJSTHour       int     `json:"start_jst_hour"`       // e.g. 16
-	EndJSTHour         int     `json:"end_jst_hour"`         // e.g. 24
-	InitialBalance     float64 `json:"initial_balance"`      // e.g. 100000.0 (10万円)
-	RiskPercent        float64 `json:"risk_percent"`         // e.g. 2.0%
-	RiskRewardRatio    float64 `json:"risk_reward_ratio"`    // e.g. 2.0
-	UseDynamicRiskLot  bool    `json:"use_dynamic_risk_lot"` // e.g. true
+	BBPeriod             int     `json:"bb_period"`              // e.g. 20
+	BBStdDev             float64 `json:"bb_std_dev"`             // e.g. 2.0
+	RSIPeriod            int     `json:"rsi_period"`             // e.g. 14
+	RSIOversold          float64 `json:"rsi_oversold"`           // e.g. 30.0
+	RSIOverbought        float64 `json:"rsi_overbought"`         // e.g. 70.0
+	ADXPeriod            int     `json:"adx_period"`             // e.g. 14
+	ADXThreshold         float64 `json:"adx_threshold"`          // e.g. 25.0
+	ATRLookback          int     `json:"atr_lookback"`           // e.g. 50
+	ATRFactor            float64 `json:"atr_factor"`             // e.g. 1.5
+	PyramiddingMax       int     `json:"pyramidding_max"`        // e.g. 2
+	TimeoutMinutes       int     `json:"timeout_minutes"`        // e.g. 120
+	LotSize              float64 `json:"lot_size"`               // e.g. 0.25 (25,000 currency units)
+	StopLossPips         float64 `json:"stop_loss_pips"`         // e.g. 10.0
+	TakeProfitPips       float64 `json:"take_profit_pips"`       // e.g. 20.0 (RR 1:2.0)
+	SpreadPips           float64 `json:"spread_pips"`            // e.g. 0.2
+	EnableHourFilter     bool    `json:"enable_hour_filter"`     // e.g. true
+	StartJSTHour         int     `json:"start_jst_hour"`         // e.g. 16
+	EndJSTHour           int     `json:"end_jst_hour"`           // e.g. 24
+	InitialBalance       float64 `json:"initial_balance"`        // e.g. 100000.0 (10万円)
+	RiskPercent          float64 `json:"risk_percent"`           // e.g. 2.0%
+	RiskRewardRatio      float64 `json:"risk_reward_ratio"`      // e.g. 2.0
+	UseDynamicRiskLot    bool    `json:"use_dynamic_risk_lot"`   // e.g. true
+	EnableDowTrigger     bool    `json:"enable_dow_trigger"`     // e.g. true (下位足ダウ理論実体ブレイク転換確認)
+	DowLookback          int     `json:"dow_lookback"`           // e.g. 5 (直近戻り高値/押し安値ルックバック本数)
+	EnableBreakEven      bool    `json:"enable_break_even"`      // e.g. true (含み益到達時の建値ロック)
+	BreakEvenTriggerPips float64 `json:"break_even_trigger_pips"` // e.g. 5.0 (建値ロック発動pips)
+	EnableFibFilter      bool    `json:"enable_fib_filter"`      // e.g. true (上位足フィボナッチ38.2-61.8%ゾーン選別)
 }
 
 func DefaultStrategyParams() StrategyParams {
 	return StrategyParams{
-		BBPeriod:          20,
-		BBStdDev:          2.5,
-		RSIPeriod:         14,
-		RSIOversold:       25.0,
-		RSIOverbought:     75.0,
-		ADXPeriod:         14,
-		ADXThreshold:      25.0,
-		ATRLookback:       50,
-		ATRFactor:         1.5,
-		PyramiddingMax:    2,
-		TimeoutMinutes:    60,
-		LotSize:           0.20,
-		StopLossPips:      10.0,
-		TakeProfitPips:    20.0,
-		SpreadPips:        0.2,
-		EnableHourFilter:  true,
-		StartJSTHour:      16,
-		EndJSTHour:        24,
-		InitialBalance:    100000.0,
-		RiskPercent:       2.0,
-		RiskRewardRatio:   2.0,
-		UseDynamicRiskLot: true,
+		BBPeriod:             20,
+		BBStdDev:             2.5,
+		RSIPeriod:            14,
+		RSIOversold:          25.0,
+		RSIOverbought:        75.0,
+		ADXPeriod:            14,
+		ADXThreshold:         25.0,
+		ATRLookback:          50,
+		ATRFactor:            1.5,
+		PyramiddingMax:       2,
+		TimeoutMinutes:       60,
+		LotSize:              0.20,
+		StopLossPips:         10.0,
+		TakeProfitPips:       20.0,
+		SpreadPips:           0.2,
+		EnableHourFilter:     true,
+		StartJSTHour:         16,
+		EndJSTHour:           24,
+		InitialBalance:       100000.0,
+		RiskPercent:          2.0,
+		RiskRewardRatio:      2.0,
+		UseDynamicRiskLot:    true,
+		EnableDowTrigger:     true,
+		DowLookback:          5,
+		EnableBreakEven:      false,
+		BreakEvenTriggerPips: 5.0,
+		EnableFibFilter:      true,
 	}
 }
 
 // SimulatedTrade represents a simulated trade in backtesting
 type SimulatedTrade struct {
-	Ticket     int       `json:"ticket"`
-	Action     string    `json:"action"` // "BUY" or "SELL"
-	Lots       float64   `json:"lots"`
-	OpenPrice  float64   `json:"open_price"`
-	ClosePrice float64   `json:"close_price"`
-	OpenTime   time.Time `json:"open_time"`
-	CloseTime  time.Time `json:"close_time"`
-	Profit     float64   `json:"profit"`
-	Pips       float64   `json:"pips"`
-	Reason     string    `json:"reason"`
-	Regime     string    `json:"regime"`
+	Ticket           int       `json:"ticket"`
+	Action           string    `json:"action"` // "BUY" or "SELL"
+	Lots             float64   `json:"lots"`
+	OpenPrice        float64   `json:"open_price"`
+	ClosePrice       float64   `json:"close_price"`
+	OpenTime         time.Time `json:"open_time"`
+	CloseTime        time.Time `json:"close_time"`
+	Profit           float64   `json:"profit"`
+	Pips             float64   `json:"pips"`
+	Reason           string    `json:"reason"`
+	Regime           string    `json:"regime"`
+	EffectiveSLPrice float64   `json:"effective_sl_price"`
+	BEActivated      bool      `json:"be_activated"`
 }
 
 // MonthlyProfit holds monthly PnL summary
@@ -177,26 +189,61 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			}
 
 			if !closed {
+				// Break-Even Lock Check
+				beTriggerPips := params.BreakEvenTriggerPips
+				if beTriggerPips <= 0 {
+					beTriggerPips = 5.0
+				}
+				if params.EnableBreakEven {
+					if pos.Action == "BUY" {
+						currentMaxPips := (currentBar.High - pos.OpenPrice) / pipSize
+						if currentMaxPips >= beTriggerPips && !pos.BEActivated {
+							pos.BEActivated = true
+							pos.EffectiveSLPrice = pos.OpenPrice + (0.2 * pipSize) // BE + 0.2pips spread cover
+						}
+					} else {
+						currentMaxPips := (pos.OpenPrice - currentBar.Low) / pipSize
+						if currentMaxPips >= beTriggerPips && !pos.BEActivated {
+							pos.BEActivated = true
+							pos.EffectiveSLPrice = pos.OpenPrice - (0.2 * pipSize)
+						}
+					}
+				}
+
 				tpPips := params.StopLossPips * params.RiskRewardRatio
 				if pos.Action == "BUY" {
-					slPrice := pos.OpenPrice - (params.StopLossPips * pipSize)
+					slPrice := pos.EffectiveSLPrice
+					if slPrice <= 0 {
+						slPrice = pos.OpenPrice - (params.StopLossPips * pipSize)
+					}
 					tpPrice := pos.OpenPrice + (tpPips * pipSize)
 					if currentBar.Low <= slPrice {
 						closed = true
 						closePrice = slPrice
-						reason = "SL_HIT"
+						if pos.BEActivated {
+							reason = "BE_EXIT"
+						} else {
+							reason = "SL_HIT"
+						}
 					} else if currentBar.High >= tpPrice {
 						closed = true
 						closePrice = tpPrice
 						reason = "TP_HIT"
 					}
 				} else {
-					slPrice := pos.OpenPrice + (params.StopLossPips * pipSize)
+					slPrice := pos.EffectiveSLPrice
+					if slPrice <= 0 {
+						slPrice = pos.OpenPrice + (params.StopLossPips * pipSize)
+					}
 					tpPrice := pos.OpenPrice - (tpPips * pipSize)
 					if currentBar.High >= slPrice {
 						closed = true
 						closePrice = slPrice
-						reason = "SL_HIT"
+						if pos.BEActivated {
+							reason = "BE_EXIT"
+						} else {
+							reason = "SL_HIT"
+						}
 					} else if currentBar.Low <= tpPrice {
 						closed = true
 						closePrice = tpPrice
@@ -285,9 +332,66 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			continue
 		}
 
-		// 4. Mean Reversion Signal Generation (BB + RSI)
-		buySignal := currentClose < bbLower[i] && rsi[i] < params.RSIOversold
-		sellSignal := currentClose > bbUpper[i] && rsi[i] > params.RSIOverbought
+		// 4. Mean Reversion Signal Generation with Dow Theory Reversal Confirmation
+		buySignal := false
+		sellSignal := false
+
+		if params.EnableDowTrigger {
+			dowLookback := params.DowLookback
+			if dowLookback <= 0 {
+				dowLookback = 5
+			}
+
+			// 直近 dowLookback 本の中で過熱ゾーンにタッチしたか確認
+			touchedBuyZone := false
+			touchedSellZone := false
+			for k := 1; k <= dowLookback && i-k >= 0; k++ {
+				if lows[i-k] <= bbLower[i-k] || rsi[i-k] <= params.RSIOversold {
+					touchedBuyZone = true
+				}
+				if highs[i-k] >= bbUpper[i-k] || rsi[i-k] >= params.RSIOverbought {
+					touchedSellZone = true
+				}
+			}
+
+			// BUY: 過熱ゾーンタッチ後の反転初動（前足高値を実体上抜け ＆ 陽線）
+			if touchedBuyZone && currentClose > highs[i-1] && currentBar.Close > currentBar.Open {
+				buySignal = true
+			}
+
+			// SELL: 過熱ゾーンタッチ後の反転初動（前足安値を実体下抜け ＆ 陰線）
+			if touchedSellZone && currentClose < lows[i-1] && currentBar.Close < currentBar.Open {
+				sellSignal = true
+			}
+		} else {
+			buySignal = currentClose < bbLower[i] && rsi[i] < params.RSIOversold
+			sellSignal = currentClose > bbUpper[i] && rsi[i] > params.RSIOverbought
+		}
+
+		// 5. Fibonacci Retracement Zone Filter (38.2% - 61.8% golden ratio zone)
+		if params.EnableFibFilter && i >= 60 {
+			lookback := 180
+			if i < lookback {
+				lookback = i
+			}
+			swingHigh := highs[i-1]
+			swingLow := lows[i-1]
+			for k := 1; k <= lookback; k++ {
+				if highs[i-k] > swingHigh {
+					swingHigh = highs[i-k]
+				}
+				if lows[i-k] < swingLow {
+					swingLow = lows[i-k]
+				}
+			}
+			swingRange := swingHigh - swingLow
+			if swingRange > 0.15 { // 有効なスイング幅が存在する場合
+				retracementBuy := (swingHigh - currentClose) / swingRange
+				retracementSell := (currentClose - swingLow) / swingRange
+				buySignal = buySignal && (retracementBuy >= 0.30 && retracementBuy <= 0.70)
+				sellSignal = sellSignal && (retracementSell >= 0.30 && retracementSell <= 0.70)
+			}
+		}
 
 		if buySignal || sellSignal {
 			action := "BUY"
@@ -358,25 +462,39 @@ func (e *BacktestEngine) Run(bars []Bar, params StrategyParams) BacktestResult {
 			if sameCount < params.PyramiddingMax && canPyramid {
 				// Dynamic 2% Risk Lot Sizing (Compounding)
 				lot := params.LotSize
-				if params.UseDynamicRiskLot {
-					currentCapital := params.InitialBalance + runningEquity
-					if currentCapital < 10000.0 {
-						currentCapital = 10000.0
+				if params.UseDynamicRiskLot && params.RiskPercent > 0 {
+					currentBalance := params.InitialBalance + runningEquity
+					if currentBalance < 10000.0 {
+						currentBalance = 10000.0
 					}
-					allowedRiskJPY := currentCapital * (params.RiskPercent / 100.0)
-					calcLot := allowedRiskJPY / (params.StopLossPips * 1000.0)
-					lot = math.Max(0.01, math.Min(5.00, math.Floor(calcLot*100)/100))
+					riskAmountJPY := currentBalance * (params.RiskPercent / 100.0)
+					calculatedLot := riskAmountJPY / (params.StopLossPips * 1000.0)
+					lot = math.Round(calculatedLot*100) / 100
+					if lot < 0.01 {
+						lot = 0.01
+					}
+					if lot > 5.0 {
+						lot = 5.0
+					}
 				}
 
-				activePositions = append(activePositions, &SimulatedTrade{
-					Ticket:    ticketCounter,
-					Action:    action,
-					Lots:      lot,
-					OpenPrice: openPrice,
-					OpenTime:  currentBar.Time,
-					Regime:    regime,
-				})
+				initialSL := openPrice - (params.StopLossPips * pipSize)
+				if action == "SELL" {
+					initialSL = openPrice + (params.StopLossPips * pipSize)
+				}
+
+				newPos := &SimulatedTrade{
+					Ticket:           ticketCounter,
+					Action:           action,
+					Lots:             lot,
+					OpenPrice:        openPrice,
+					OpenTime:         currentBar.Time,
+					Regime:           regime,
+					EffectiveSLPrice: initialSL,
+					BEActivated:      false,
+				}
 				ticketCounter++
+				activePositions = append(activePositions, newPos)
 			}
 		}
 	}
